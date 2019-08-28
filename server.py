@@ -1,7 +1,6 @@
-from http.cookies import SimpleCookie
-from http.server import BaseHTTPRequestHandler, HTTPServer
-import urllib.parse
-import uuid
+import eventlet
+import minishogilib
+import socketio
 
 class Game:
     def __init__(self):
@@ -14,66 +13,66 @@ class Game:
         # Clients
         self.clients = []
 
-# Global game object
-game = Game()
-
 class Client:
     def __init__(self):
-        self.id = None
-
-class Hander(BaseHTTPRequestHandler):
-    def do_GET(self):
-        self.wfile.write(b'Position, kif and something will be here.')
-
-    def do_POST(self):
-        global game
-
-        if self.path == '/match':
-            length = self.headers.get('content-length')
-
-            if length is not None:
-                nbytes = int(length)
-                post_data = self.rfile.read(nbytes)
-                post_data = post_data.decode('utf-8')
-                post_data = urllib.parse.parse_qs(post_data)
-
-                if len(game.clients) >= 2:
-                    self.send_response(406)
-                    self.send_header('Content_Type', 'text/plain; charset=utf-8')
-                    self.end_headers()
-                    self.wfile.write('The game is already held.'.encode('utf-8'))
-                    return
-
-                if not 'name' in post_data:
-                    self.send_response(406)
-                    self.send_header('Content_Type', 'text/plain; charset=utf-8')
-                    self.end_headers()
-                    self.wfile.write('You send a request but name field is None.'.encode('utf-8'))
-                    return
-
-                if not 'author' in post_data:
-                    self.send_response(406)
-                    self.send_header('Content_Type', 'text/plain; charset=utf-8')
-                    self.end_headers()
-                    self.wfile.write('You send a request but author field is None.'.encode('utf-8'))
-                    return
-
-                self.send_response(200)
-                self.send_header('Content_Type', 'text/plain; charset=utf-8')
-                self.end_headers()
-
-                client = Client()
-                client.id = str(uuid.uuid4())
-                game.clients.append(client)
-
-                print(game.clients)
-
-                self.wfile.write(client.id.encode('utf-8'))
+        self.sid = None
 
 def main(port=8000):
-    server_address = ('localhost', port)
-    httpd = HTTPServer(server_address, Hander)
-    httpd.serve_forever()
+    game = Game()
+
+    sio = socketio.Server()
+
+    def ask_nextmove(sid):
+        sio.emit('position', '<SFEN_POSITION>', room=sid)
+        sio.emit('go', 'go btime <BTIME> wtime <WTIME> byoyomi <BYOYOMI>', room=sid)
+
+    @sio.on('usi')
+    def usi(sid, data):
+        if len(game.clients) >= 2:
+            sio.emit('error', 'The game has already started.', room=sid)
+            return
+
+        if not 'name' in data:
+            sio.emit('error', 'You sent a request but name field was None.', room=sid)
+            return
+
+        if not 'author' in data:
+            sio.emit('error', 'You sent a request but author field was None.', room=sid)
+            return
+
+        client = Client()
+        client.sid = sid
+
+        game.clients.append(client)
+
+        sio.emit('info', 'Correctly accepted.', room=sid)
+
+        if len(game.clients) == 2:
+            # Two players sit down, so a game is starting
+            # Initialization
+            game.position = minishogilib.Position()
+            game.position.set_start_position()
+
+            # Ask a first move
+            ask_nextmove(game.clients[0].sid)
+
+    @sio.on('bestmove')
+    def bestmove(sid, data):
+        color = position.get_side_to_move()
+
+        # An unknown player sent 'bestmove' command, so discard it
+        if clients[color].sid != sid:
+            return
+
+        # Apply the sent move
+        sfen_move = position.sfen_to_move(data)
+        position.do_move(sfen_move)
+
+        # Ask the other player to send a next move
+        ask_nextmove(sid)
+
+    app = socketio.WSGIApp(sio)
+    eventlet.wsgi.server(eventlet.listen(('localhost', port)), app)
 
 if __name__ == '__main__':
     main()
