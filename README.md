@@ -17,13 +17,3 @@ python3 server.py --port <PORT>
 ```bash
 python3 client.py --ip <TARGET IP> --port <TARGET PORT>
 ```
-
-## Watch the game
-
-The server uses HTTP protocol and you can watch the game through your browser.
-
-To watch the game, type following URL.
-
-```
-http://<TARGET IP>:<TARGET PORT>
-```
