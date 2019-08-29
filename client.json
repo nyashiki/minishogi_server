@@ -1,0 +1,4 @@
+{
+    "command": "<command to execute an usi program>",
+    "cwd": "<current working directory>"
+}
