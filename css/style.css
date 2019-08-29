@@ -1,37 +1,25 @@
-* {
-	margin: 0;
-	padding: 0;
-}
-
 #board {
-        box-sizing: border-box;
-        border: solid black;
-        float: left;
-        width: 400px;
-        height: 400px;
-        margin-left: 20px;
-        margin-right: 20px;
+    box-sizing: border-box;
+    border: solid black;
+    float: left;
+    width: 448px;
+    height: 384px;
+    border-width: 1px;
+    margin: 10px;
 }
 
 #record {
-        box-sizing: border-box;
-        border: solid black;
-        float: left;
-        width: 100px;
-        height: 400px;
+    box-sizing: border-box;
+    border: solid black;
+    border-width: 1px;
+    float: left;
+    width: 100px;
+    height: 384px;
+    margin: 10px;
 }
 
 #time {
-        box-sizing: border-box;
-        border: solid black;
-        width: 520px;
-        height: 3cm;
-        margin-left: 20px;
-        margin-top: 20px;
-}
-
-main::after {
-        content:  "";
-        display: block;
-        clear: both;
+    width: 448px;
+    margin: 10px;
+    display: block;
 }

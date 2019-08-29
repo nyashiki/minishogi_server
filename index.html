@@ -1,25 +1,28 @@
 <html>
-
-<head>
+    <head>
         <title>
-                Watching
+            Watching
         </title>
         <link rel="stylesheet" href="css/style.css">
-</head>
+    </head>
 
-<body>
+    <body>
+        <div>
+            <div>
+                <canvas id="board">
+                </canvas>
 
-        <main>
-                <div id="board">
-                        盤面
-                </div>
-                <div id="record">
-                        棋譜
-                </div>
-        </main>
-        <div id="time">
-                残り時間
+                <select id="record" size="10">
+                    <option>4e4d</option>
+                    <option>2a2b</option>
+                    <option>...</option>
+                </select>
+            </div>
+
+            <div id="time">
+                先手残り X分 <br>
+                後手残り Y分
+            </div>
         </div>
-</body>
-
+    </body>
 </html>
