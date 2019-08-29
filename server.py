@@ -23,8 +23,14 @@ def main(port=8000):
     sio = socketio.Server()
 
     def ask_nextmove(sid):
-        sio.emit('position', '<SFEN_POSITION>', room=sid)
-        sio.emit('go', 'go btime <BTIME> wtime <WTIME> byoyomi <BYOYOMI>', room=sid)
+        data = {
+            'position': game.position.sfen(True),
+            'btime': 0,
+            'wtime': 0,
+            'byoyomi': 0
+        }
+
+        sio.emit('nextmove', data, room=sid)
 
     @sio.on('usi')
     def usi(sid, data):
@@ -56,20 +62,43 @@ def main(port=8000):
             # Ask a first move
             ask_nextmove(game.clients[0].sid)
 
+    # ToDo: @sio.event disconnect()
+
     @sio.on('bestmove')
     def bestmove(sid, data):
-        color = position.get_side_to_move()
+        game.position.print()
+
+        color = game.position.get_side_to_move()
 
         # An unknown player sent 'bestmove' command, so discard it
-        if clients[color].sid != sid:
+        if game.clients[color].sid != sid:
             return
 
+        sfen_move = data
+
+        # ToDo: check whether the sent move is legal
+
         # Apply the sent move
-        sfen_move = position.sfen_to_move(data)
-        position.do_move(sfen_move)
+        move = game.position.sfen_to_move(sfen_move)
+        game.position.do_move(move)
+
+        # Is the game end?
+        is_repetition, is_check_repetition = game.position.is_repetition()
+        if is_check_repetition:
+            # ToDo: check repetition
+            pass
+
+        elif is_repetition:
+            # ToDo: repetition
+            pass
+
+        legal_moves = game.position.generate_moves()
+        if len(legal_moves) == 0:
+            # ToDo: no legal moves. It means the current player hast lost.
+            pass
 
         # Ask the other player to send a next move
-        ask_nextmove(sid)
+        ask_nextmove(game.clients[1 - color].sid)
 
     app = socketio.WSGIApp(sio)
     eventlet.wsgi.server(eventlet.listen(('localhost', port)), app)
