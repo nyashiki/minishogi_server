@@ -1,5 +1,6 @@
 import eventlet
 import minishogilib
+import simplejson as json
 import socketio
 
 class Game:
@@ -22,12 +23,15 @@ def main(port=8000):
 
     sio = socketio.Server()
 
+    with open('server.json') as f:
+        config = json.load(f)
+
     def ask_nextmove(sid):
         data = {
             'position': game.position.sfen(True),
-            'btime': 0,
-            'wtime': 0,
-            'byoyomi': 0
+            'btime': config['btime'],
+            'wtime': config['wtime'],
+            'byoyomi': config['byoyomi']
         }
 
         sio.emit('nextmove', data, room=sid)
