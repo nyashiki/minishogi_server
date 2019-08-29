@@ -1,3 +1,4 @@
 {
-    "path": "<path to an usi program>"
+    "command": "<command to execute an usi program>",
+    "cwd": "<current working directory>"
 }
