@@ -1,4 +1,8 @@
 {
     "command": "<command to execute an usi program>",
-    "cwd": "<current working directory>"
+    "cwd": "<current working directory>",
+
+    "option": {
+        "UCI_Variant": "minishogi"
+    }
 }
