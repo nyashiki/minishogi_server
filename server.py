@@ -126,7 +126,11 @@ def main(port=8000):
         # Ask the other player to send a next move
         ask_nextmove(game.clients[1 - color].sid)
 
-    app = socketio.WSGIApp(sio)
+    static_files = {
+        '/': './index.html',
+        '/css/': './css/'
+    }
+    app = socketio.WSGIApp(sio, static_files=static_files)
     eventlet.wsgi.server(eventlet.listen(('localhost', port)), app)
 
 if __name__ == '__main__':
