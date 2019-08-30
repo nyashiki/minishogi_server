@@ -23,6 +23,11 @@ def main(ip='localhost', port=8000):
         if output[0] == 'usiok':
             break
 
+    # Set options
+    for option, value in config['option'].items():
+        message = 'setoption name {} value {}'.format(option, value)
+        send_message(usi_engine, message)
+
     sio = socketio.Client()
 
     @sio.event
