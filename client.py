@@ -106,8 +106,8 @@ def main(ip='localhost', port=8000):
             if output[0] == 'bestmove':
                 sio.emit('bestmove', output[1], namespace='/match')
 
-    @sio.event
-    def disconnect(data=None, namespace='/match'):
+    @sio.event(namespace='/match')
+    def disconnect(data=None):
         send_message(usi_engine, 'quit')
         usi_engine.wait()
         os._exit(0)
