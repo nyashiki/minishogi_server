@@ -63,6 +63,12 @@ def main(port=8000):
             game.position = minishogilib.Position()
             game.position.set_start_position()
 
+            # Call isready and usinewgame
+            sio.emit('isready')
+            sio.emit('usinewgame')
+
+            game.position.print()
+
             # Ask a first move
             ask_nextmove(game.clients[0].sid)
 
