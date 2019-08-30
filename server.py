@@ -1,5 +1,6 @@
 import eventlet
 import minishogilib
+import os
 import simplejson as json
 import socketio
 
@@ -63,6 +64,12 @@ def main(port=8000):
             game.position = minishogilib.Position()
             game.position.set_start_position()
 
+            # Call isready and usinewgame
+            sio.emit('isready')
+            sio.emit('usinewgame')
+
+            game.position.print()
+
             # Ask a first move
             ask_nextmove(game.clients[0].sid)
 
@@ -70,8 +77,6 @@ def main(port=8000):
 
     @sio.on('bestmove')
     def bestmove(sid, data):
-        game.position.print()
-
         color = game.position.get_side_to_move()
 
         # An unknown player sent 'bestmove' command, so discard it
@@ -80,26 +85,43 @@ def main(port=8000):
 
         sfen_move = data
 
-        # ToDo: check whether the sent move is legal
+        if sfen_move == 'resign':
+            print('RESIGN')
+            sio.emit('disconnect')
+            os._exit(0)
+
+        move = game.position.sfen_to_move(sfen_move)
+
+        # check whether the sent move is legal
+        legal_moves = game.position.generate_moves()
+        if not move.sfen() in [m.sfen() for m in legal_moves]:
+            print(move.sfen())
+            print([m.sfen() for m in legal_moves])
+            print('ILLEGAL MOVE')
+            sio.emit('disconnect')
+            os._exit(0)
 
         # Apply the sent move
-        move = game.position.sfen_to_move(sfen_move)
         game.position.do_move(move)
+        game.position.print()
 
         # Is the game end?
         is_repetition, is_check_repetition = game.position.is_repetition()
+        legal_moves = game.position.generate_moves()
         if is_check_repetition:
-            # ToDo: check repetition
-            pass
+            print('CHECK REPETITION')
+            sio.emit('disconnect')
+            os._exit(0)
 
         elif is_repetition:
-            # ToDo: repetition
-            pass
+            print('REPETITION')
+            sio.emit('disconnect')
+            os._exit(0)
 
-        legal_moves = game.position.generate_moves()
         if len(legal_moves) == 0:
-            # ToDo: no legal moves. It means the current player hast lost.
-            pass
+            print('NO LEGAL MOVE')
+            sio.emit('disconnect')
+            os._exit(0)
 
         # Ask the other player to send a next move
         ask_nextmove(game.clients[1 - color].sid)
