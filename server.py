@@ -37,6 +37,12 @@ def main(port=8000):
 
         sio.emit('nextmove', data, namespace='/match', room=sid)
 
+    def display(sio):
+        game.position.print()
+        sio.emit('display', {
+            'svg': None if game.position is None else game.position.to_svg()
+        })
+
     @sio.on('usi', namespace='/match')
     def usi(sid, data):
         if len(game.clients) >= 2:
@@ -68,7 +74,7 @@ def main(port=8000):
             sio.emit('isready', namespace='/match')
             sio.emit('usinewgame', namespace='/match')
 
-            game.position.print()
+            display(sio)
 
             # Ask a first move
             ask_nextmove(game.clients[0].sid)
@@ -88,22 +94,18 @@ def main(port=8000):
         if sfen_move == 'resign':
             print('RESIGN')
             sio.emit('disconnect', namespace='/match')
-            os._exit(0)
 
         move = game.position.sfen_to_move(sfen_move)
 
         # check whether the sent move is legal
         legal_moves = game.position.generate_moves()
         if not move.sfen() in [m.sfen() for m in legal_moves]:
-            print(move.sfen())
-            print([m.sfen() for m in legal_moves])
             print('ILLEGAL MOVE')
             sio.emit('disconnect', namespace='/match')
-            os._exit(0)
 
         # Apply the sent move
         game.position.do_move(move)
-        game.position.print()
+        display(sio)
 
         # Is the game end?
         is_repetition, is_check_repetition = game.position.is_repetition()
@@ -111,20 +113,18 @@ def main(port=8000):
         if is_check_repetition:
             print('CHECK REPETITION')
             sio.emit('disconnect', namespace='/match')
-            os._exit(0)
 
         elif is_repetition:
             print('REPETITION')
             sio.emit('disconnect', namespace='/match')
-            os._exit(0)
 
-        if len(legal_moves) == 0:
+        elif len(legal_moves) == 0:
             print('NO LEGAL MOVE')
             sio.emit('disconnect', namespace='/match')
-            os._exit(0)
 
-        # Ask the other player to send a next move
-        ask_nextmove(game.clients[1 - color].sid)
+        else:
+            # Ask the other player to send a next move
+            ask_nextmove(game.clients[1 - color].sid)
 
     static_files = {
         '/': './index.html',

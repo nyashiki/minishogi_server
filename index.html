@@ -1,16 +1,34 @@
 <html>
     <head>
+        <meta charset="utf-8">
+
         <title>
             Watching
         </title>
-        <link rel="stylesheet" href="css/style.css">
+
+        <link rel="stylesheet" href="./css/style.css">
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/2.2.0/socket.io.js"></script>
+        <script>
+            var url = window.location.protocol + "//" + window.location.host + "/";
+            var socket = io(url);
+
+            var position_data = null;
+
+            socket.on('display', function(data) {
+                document.getElementById("board").innerHTML = data['svg'];
+            });
+
+            var display = function() {
+                socket.emit('view');
+            };
+        </script>
     </head>
 
     <body>
         <div>
             <div>
-                <canvas id="board">
-                </canvas>
+                <div id="board">
+                </div>
 
                 <select id="record" size="10">
                     <option>4e4d</option>
