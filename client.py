@@ -18,7 +18,7 @@ def receive_message(engine, verbose=True):
     while True:
         read = engine.stdout.read(1)
 
-        if read == b'' or read == b'\n':
+        if output != b'' and (read == b'' or read == b'\n'):
             break
 
         output += read
