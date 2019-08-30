@@ -35,20 +35,20 @@ def main(port=8000):
             'byoyomi': config['byoyomi']
         }
 
-        sio.emit('nextmove', data, room=sid)
+        sio.emit('nextmove', data, namespace='/match', room=sid)
 
-    @sio.on('usi')
+    @sio.on('usi', namespace='/match')
     def usi(sid, data):
         if len(game.clients) >= 2:
-            sio.emit('error', 'The game has already started.', room=sid)
+            sio.emit('error', 'The game has already started.', namespace='/match', room=sid)
             return
 
         if not 'name' in data:
-            sio.emit('error', 'You sent a request but name field was None.', room=sid)
+            sio.emit('error', 'You sent a request but name field was None.', namespace='/match', room=sid)
             return
 
         if not 'author' in data:
-            sio.emit('error', 'You sent a request but author field was None.', room=sid)
+            sio.emit('error', 'You sent a request but author field was None.', namespace='/match', room=sid)
             return
 
         client = Client()
@@ -56,7 +56,7 @@ def main(port=8000):
 
         game.clients.append(client)
 
-        sio.emit('info', 'Correctly accepted.', room=sid)
+        sio.emit('info', 'Correctly accepted.', namespace='/match', room=sid)
 
         if len(game.clients) == 2:
             # Two players sit down, so a game is starting
@@ -65,8 +65,8 @@ def main(port=8000):
             game.position.set_start_position()
 
             # Call isready and usinewgame
-            sio.emit('isready')
-            sio.emit('usinewgame')
+            sio.emit('isready', namespace='/match')
+            sio.emit('usinewgame', namespace='/match')
 
             game.position.print()
 
@@ -75,7 +75,7 @@ def main(port=8000):
 
     # ToDo: @sio.event disconnect()
 
-    @sio.on('bestmove')
+    @sio.on('bestmove', namespace='/match')
     def bestmove(sid, data):
         color = game.position.get_side_to_move()
 
@@ -87,7 +87,7 @@ def main(port=8000):
 
         if sfen_move == 'resign':
             print('RESIGN')
-            sio.emit('disconnect')
+            sio.emit('disconnect', namespace='/match')
             os._exit(0)
 
         move = game.position.sfen_to_move(sfen_move)
@@ -98,7 +98,7 @@ def main(port=8000):
             print(move.sfen())
             print([m.sfen() for m in legal_moves])
             print('ILLEGAL MOVE')
-            sio.emit('disconnect')
+            sio.emit('disconnect', namespace='/match')
             os._exit(0)
 
         # Apply the sent move
@@ -110,17 +110,17 @@ def main(port=8000):
         legal_moves = game.position.generate_moves()
         if is_check_repetition:
             print('CHECK REPETITION')
-            sio.emit('disconnect')
+            sio.emit('disconnect', namespace='/match')
             os._exit(0)
 
         elif is_repetition:
             print('REPETITION')
-            sio.emit('disconnect')
+            sio.emit('disconnect', namespace='/match')
             os._exit(0)
 
         if len(legal_moves) == 0:
             print('NO LEGAL MOVE')
-            sio.emit('disconnect')
+            sio.emit('disconnect', namespace='/match')
             os._exit(0)
 
         # Ask the other player to send a next move

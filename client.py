@@ -59,20 +59,20 @@ def main(ip='localhost', port=8000):
 
     sio = socketio.Client()
 
-    @sio.event
+    @sio.event(namespace='/match')
     def connect(data=None):
-        sio.emit('usi', engine_info)
+        sio.emit('usi', engine_info, namespace='/match')
 
-    @sio.on('error')
+    @sio.on('error', namespace='/match')
     def error(message):
         print('ERROR: {}'.format(message))
         exit(0)
 
-    @sio.on('info')
+    @sio.on('info', namespace='/match')
     def info(message):
         print('INFO: {}'.format(message))
 
-    @sio.on('isready')
+    @sio.on('isready', namespace='/match')
     def isready(data):
         send_message(usi_engine, 'isready')
 
@@ -85,11 +85,11 @@ def main(ip='localhost', port=8000):
             if output[0] == 'readyok':
                 break
 
-    @sio.on('usinewgame')
+    @sio.on('usinewgame', namespace='/match')
     def usinewgame(data):
         send_message(usi_engine, 'usinewgame')
 
-    @sio.on('nextmove')
+    @sio.on('nextmove', namespace='/match')
     def nextmove(data):
         sfen_position = 'position sfen ' + data['position']
         send_message(usi_engine, sfen_position)
@@ -104,10 +104,10 @@ def main(ip='localhost', port=8000):
                 continue
 
             if output[0] == 'bestmove':
-                sio.emit('bestmove', output[1])
+                sio.emit('bestmove', output[1], namespace='/match')
 
     @sio.event
-    def disconnect(data=None):
+    def disconnect(data=None, namespace='/match'):
         send_message(usi_engine, 'quit')
         usi_engine.wait()
         os._exit(0)
