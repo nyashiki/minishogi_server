@@ -1,8 +1,10 @@
 import eventlet
 import minishogilib
+from optparse import OptionParser
 import os
 import simplejson as json
 import socketio
+
 
 class Game:
     def __init__(self):
@@ -19,12 +21,12 @@ class Client:
     def __init__(self):
         self.sid = None
 
-def main(port=8000):
+def main(port, config_json):
     game = Game()
 
     sio = socketio.Server()
 
-    with open('server.json') as f:
+    with open(config_json) as f:
         config = json.load(f)
 
     def ask_nextmove(sid):
@@ -134,4 +136,10 @@ def main(port=8000):
     eventlet.wsgi.server(eventlet.listen(('localhost', port)), app)
 
 if __name__ == '__main__':
-    main()
+    parser = OptionParser()
+    parser.add_option('-c', '--config', dest='config_json', help='confile json file', default='./server.json')
+    parser.add_option('-p', '--port', dest='port', help='target port', type='int', default=8000)
+
+    (options, args) = parser.parse_args()
+
+    main(port=options.port, config_json=options.config_json)

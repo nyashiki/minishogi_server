@@ -1,8 +1,10 @@
 import logging
+from optparse import OptionParser
 import os
 import simplejson as json
 import socketio
 import subprocess
+
 
 def send_message(engine, message, verbose=True):
     if verbose:
@@ -30,8 +32,8 @@ def receive_message(engine, verbose=True):
 
     return output
 
-def main(ip='localhost', port=8000):
-    with open('client.json') as f:
+def main(ip, port, config_json):
+    with open(config_json) as f:
         config = json.load(f)
 
     usi_engine = subprocess.Popen(config['command'].split(), cwd=config['cwd'], stdin=subprocess.PIPE, stdout=subprocess.PIPE)
@@ -117,4 +119,11 @@ def main(ip='localhost', port=8000):
     sio.wait()
 
 if __name__ == '__main__':
-    main()
+    parser = OptionParser()
+    parser.add_option('-c', '--config', dest='config_json', help='confile json file', default='./client.json')
+    parser.add_option('-i', '--ip', dest='ip', help='target ip', default='localhost')
+    parser.add_option('-p', '--port', dest='port', help='target port', type='int', default=8000)
+
+    (options, args) = parser.parse_args()
+
+    main(ip=options.ip, port=options.port, config_json=options.config_json)
