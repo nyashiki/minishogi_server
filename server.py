@@ -37,6 +37,7 @@ def main(port, config_json):
             'byoyomi': config['byoyomi']
         }
 
+        print('send nextmove to {}'.format(sid))
         sio.emit('nextmove', data, namespace='/match', room=sid)
 
     def display(sio):
@@ -74,17 +75,21 @@ def main(port, config_json):
 
             # Call isready and usinewgame
             sio.emit('isready', namespace='/match')
-            sio.emit('usinewgame', namespace='/match')
-
-            display(sio)
-
-            # Ask a first move
-            ask_nextmove(game.clients[0].sid)
 
     # ToDo: @sio.event disconnect()
 
+    @sio.on('readyok', namespace='/match')
+    def readyok(sid, data=None):
+        sio.emit('usinewgame', namespace='/match')
+        display(sio)
+
+        # Ask a first move
+        ask_nextmove(game.clients[0].sid)
+
     @sio.on('bestmove', namespace='/match')
     def bestmove(sid, data):
+        print('get bestmove from {}'.format(sid))
+
         color = game.position.get_side_to_move()
 
         # An unknown player sent 'bestmove' command, so discard it

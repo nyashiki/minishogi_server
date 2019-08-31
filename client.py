@@ -19,7 +19,7 @@ def send_message(engine, message, verbose=True):
 def message_reader(pipe, queue):
     with pipe:
         for line in iter(pipe.readline, b''):
-          queue.put(line.decode('utf-8').rstrip('\r\n'))
+            queue.put(line.decode('utf-8').rstrip('\r\n'))
 
 def receive_message(engine, queue, verbose=True):
     while queue.empty():
@@ -89,6 +89,8 @@ def main(ip, port, config_json):
 
             if output[0] == 'readyok':
                 break
+
+        sio.emit('readyok', namespace='/match')
 
     @sio.on('usinewgame', namespace='/match')
     def usinewgame(data):
