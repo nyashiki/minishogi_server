@@ -19,7 +19,7 @@ def send_message(engine, message, verbose=True):
 def message_reader(pipe, queue):
     with pipe:
         for line in iter(pipe.readline, b''):
-          queue.put(line.decode('utf-8').strip())
+          queue.put(line.decode('utf-8').rstrip('\r\n'))
 
 def receive_message(engine, queue, verbose=True):
     while queue.empty():
