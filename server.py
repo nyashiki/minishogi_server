@@ -148,7 +148,7 @@ def main(port, config_json):
         '/css/': './css/'
     }
     app = socketio.WSGIApp(sio, static_files=static_files)
-    eventlet.wsgi.server(eventlet.listen(('localhost', port)), app)
+    eventlet.wsgi.server(eventlet.listen(('', port)), app)
 
 if __name__ == '__main__':
     parser = OptionParser()
