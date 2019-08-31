@@ -20,6 +20,7 @@ class Game:
 class Client:
     def __init__(self):
         self.sid = None
+        self.readyok = False
 
 def main(port, config_json):
     game = Game()
@@ -40,11 +41,11 @@ def main(port, config_json):
         print('send nextmove to {}'.format(sid))
         sio.emit('nextmove', data, namespace='/match', room=sid)
 
-    def display(sio):
+    def display(sid):
         game.position.print()
         sio.emit('display', {
             'svg': None if game.position is None else game.position.to_svg()
-        })
+        }, room=sid)
 
     @sio.on('usi', namespace='/match')
     def usi(sid, data):
@@ -68,23 +69,32 @@ def main(port, config_json):
         sio.emit('info', 'Correctly accepted.', namespace='/match', room=sid)
 
         if len(game.clients) == 2:
-            # Two players sit down, so a game is starting
+            # Two players sit down, so a game is starting.
             # Initialization
             game.position = minishogilib.Position()
             game.position.set_start_position()
 
+            display(sio)
+
             # Call isready and usinewgame
-            sio.emit('isready', namespace='/match')
+            sio.emit('isready', namespace='/match', room=game.clients[0].sid)
+            sio.emit('isready', namespace='/match', room=game.clients[1].sid)
+
 
     # ToDo: @sio.event disconnect()
 
     @sio.on('readyok', namespace='/match')
     def readyok(sid, data=None):
-        sio.emit('usinewgame', namespace='/match')
-        display(sio)
+        for client in game.clients:
+            if client.sid == sid:
+                client.readyok = True
 
-        # Ask a first move
-        ask_nextmove(game.clients[0].sid)
+        if game.clients[0].readyok and game.clients[1].readyok:
+            sio.emit('usinewgame', namespace='/match', room=game.clients[0].sid)
+            sio.emit('usinewgame', namespace='/match', room=game.clients[1].sid)
+
+            # Ask a first move
+            ask_nextmove(game.clients[0].sid)
 
     @sio.on('bestmove', namespace='/match')
     def bestmove(sid, data):
