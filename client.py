@@ -3,6 +3,8 @@ import os
 import simplejson as json
 import socketio
 import subprocess
+import threading
+import queue
 
 def send_message(engine, message, verbose=True):
     if verbose:
@@ -12,23 +14,21 @@ def send_message(engine, message, verbose=True):
     engine.stdin.write(message)
     engine.stdin.flush()
 
-def receive_message(engine, verbose=True):
-    output = b''
+def message_reader(pipe, queue):
+    with pipe:
+        for line in iter(pipe.readline, b''):
+          queue.put(line.decode('utf-8').strip())
 
-    while True:
-        read = engine.stdout.read(1)
+def receive_message(engine, queue, verbose=True):
+    while queue.empty():
+        continue
 
-        if output != b'' and (read == b'' or read == b'\n'):
-            break
-
-        output += read
-
-    output = output.decode('utf-8').strip()
+    message = queue.get()
 
     if verbose:
-        print("<:", output)
+        print('<:', message)
 
-    return output
+    return message
 
 def main(ip='localhost', port=8000):
     with open('client.json') as f:
@@ -36,12 +36,15 @@ def main(ip='localhost', port=8000):
 
     usi_engine = subprocess.Popen(config['command'].split(), cwd=config['cwd'], stdin=subprocess.PIPE, stdout=subprocess.PIPE)
 
+    message_queue = queue.Queue()
+    threading.Thread(target=message_reader, args=[usi_engine.stdout, message_queue]).start()
+
     send_message(usi_engine, 'usi')
 
     engine_info = { }
 
     while True:
-        output = receive_message(usi_engine).split()
+        output = receive_message(usi_engine, message_queue).split()
 
         if len(output) == 0:
             continue
@@ -77,7 +80,7 @@ def main(ip='localhost', port=8000):
         send_message(usi_engine, 'isready')
 
         while True:
-            output = receive_message(usi_engine).split()
+            output = receive_message(usi_engine, message_queue).split()
 
             if len(output) == 0:
                 continue
@@ -98,7 +101,7 @@ def main(ip='localhost', port=8000):
         send_message(usi_engine, command)
 
         while True:
-            output = receive_message(usi_engine).split()
+            output = receive_message(usi_engine, message_queue).split()
 
             if len(output) == 0:
                 continue
