@@ -44,7 +44,8 @@ def main(port, config_json):
     def display(sid):
         game.position.print()
         sio.emit('display', {
-            'svg': None if game.position is None else game.position.to_svg()
+            'svg': None if game.position is None else game.position.to_svg(),
+            'kif': game.position.get_kif()
         })
 
     @sio.on('usi', namespace='/match')

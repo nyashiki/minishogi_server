@@ -16,6 +16,19 @@
 
             socket.on('display', function(data) {
                 document.getElementById("board").innerHTML = data['svg'];
+
+                var record = document.getElementById("record");
+                record.innerHTML = "";
+
+                var ply = 0;
+                data['kif'].forEach(function(item, index) {
+                    var option = document.createElement("option");
+                    option.text = item;
+                    record.add(option);
+                    ply++;
+                });
+
+                record.scrollTop = record.scrollHeight * Math.max(ply - 1, 0) / ply;
             });
 
             var display = function() {
@@ -31,9 +44,6 @@
                 </div>
 
                 <select id="record" size="10">
-                    <option>4e4d</option>
-                    <option>2a2b</option>
-                    <option>...</option>
                 </select>
             </div>
 
