@@ -45,7 +45,7 @@ def main(port, config_json):
         game.position.print()
         sio.emit('display', {
             'svg': None if game.position is None else game.position.to_svg()
-        }, room=sid)
+        })
 
     @sio.on('usi', namespace='/match')
     def usi(sid, data):
