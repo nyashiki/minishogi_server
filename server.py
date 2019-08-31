@@ -1,9 +1,11 @@
 import eventlet
+import math
 import minishogilib
 from optparse import OptionParser
 import os
 import simplejson as json
 import socketio
+import time
 
 
 class Game:
@@ -17,6 +19,11 @@ class Game:
         # Clients
         self.clients = []
 
+        # Stopwatch
+        self.stopwatch = [None for _ in range(2)]
+
+        self.gameover = False
+
 class Client:
     def __init__(self):
         self.sid = None
@@ -25,28 +32,69 @@ class Client:
 def main(port, config_json):
     game = Game()
 
-    sio = socketio.Server()
-
     with open(config_json) as f:
         config = json.load(f)
 
-    def ask_nextmove(sid):
+    game.timelimit[0] = config['btime'] // 1000
+    game.timelimit[1] = config['wtime'] // 1000
+    game.byoyomi = config['byoyomi'] // 1000
+
+    sio = socketio.Server()
+
+    def ask_nextmove(color):
+        sid = game.clients[color].sid
+
         data = {
             'position': game.position.sfen(True),
-            'btime': config['btime'],
-            'wtime': config['wtime'],
-            'byoyomi': config['byoyomi']
+            'btime': game.timelimit[0] * 1000,
+            'wtime': game.timelimit[1] * 1000,
+            'byoyomi': game.byoyomi * 1000
         }
 
         print('send nextmove to {}'.format(sid))
         sio.emit('nextmove', data, namespace='/match', room=sid)
 
+        game.stopwatch[color] = time.time()
+
     def display(sid):
-        game.position.print()
+        if game.position is None:
+            return
+
+        # about timelimit
+        color = game.position.get_side_to_move()
+
+        timelimit = [game.timelimit[0], game.timelimit[1]]
+        byoyomi = game.byoyomi
+
+        current_time = time.time()
+        elapsed = 0 if game.gameover or game.stopwatch[color] is None else current_time - game.stopwatch[color]
+
+        if elapsed > 0 and game.timelimit[color] > 0:
+            m = min(timelimit[color], elapsed)
+            m = 1 if m < 1 else math.floor(m)
+
+            timelimit[color] -= m
+            elapsed -= m
+
+        elapsed = max(0, math.floor(elapsed))
+        byoyomi -= elapsed
+
+        timelimit  = {
+            'btime': timelimit[0],
+            'wtime': timelimit[1],
+            'bbyoyomi': byoyomi if color == 0 else game.byoyomi,
+            'wbyoyomi': byoyomi if color == 1 else game.byoyomi
+        }
+
         sio.emit('display', {
             'svg': None if game.position is None else game.position.to_svg(),
-            'kif': game.position.get_kif()
+            'kif': game.position.get_kif(),
+            'timelimit': timelimit
         })
+
+    @sio.on('view')
+    def view(sid, data=None):
+        display(sid)
 
     @sio.on('usi', namespace='/match')
     def usi(sid, data):
@@ -75,12 +123,9 @@ def main(port, config_json):
             game.position = minishogilib.Position()
             game.position.set_start_position()
 
-            display(sio)
-
             # Call isready and usinewgame
             sio.emit('isready', namespace='/match', room=game.clients[0].sid)
             sio.emit('isready', namespace='/match', room=game.clients[1].sid)
-
 
     # ToDo: @sio.event disconnect()
 
@@ -95,7 +140,7 @@ def main(port, config_json):
             sio.emit('usinewgame', namespace='/match', room=game.clients[1].sid)
 
             # Ask a first move
-            ask_nextmove(game.clients[0].sid)
+            ask_nextmove(0)
 
     @sio.on('bestmove', namespace='/match')
     def bestmove(sid, data):
@@ -112,6 +157,7 @@ def main(port, config_json):
         if sfen_move == 'resign':
             print('RESIGN')
             sio.emit('disconnect', namespace='/match')
+            game.gameover = True
 
         move = game.position.sfen_to_move(sfen_move)
 
@@ -120,10 +166,24 @@ def main(port, config_json):
         if not move.sfen() in [m.sfen() for m in legal_moves]:
             print('ILLEGAL MOVE')
             sio.emit('disconnect', namespace='/match')
+            game.gameover = True
+
+        # time consumption
+        current_time = time.time()
+        elapsed = current_time - game.stopwatch[color]
+
+        if game.timelimit[color] > 0:
+            m = min(game.timelimit[color], elapsed)
+            m = 1 if m < 1 else math.floor(m)
+
+            game.timelimit[color] -= m
+            elapsed -= m
+        elapsed = math.floor(elapsed)
+
+        # ToDo: lose by timelimit
 
         # Apply the sent move
         game.position.do_move(move)
-        display(sio)
 
         # Is the game end?
         is_repetition, is_check_repetition = game.position.is_repetition()
@@ -131,18 +191,21 @@ def main(port, config_json):
         if is_check_repetition:
             print('CHECK REPETITION')
             sio.emit('disconnect', namespace='/match')
+            game.gameover = True
 
         elif is_repetition:
             print('REPETITION')
             sio.emit('disconnect', namespace='/match')
+            game.gameover = True
 
         elif len(legal_moves) == 0:
             print('NO LEGAL MOVE')
             sio.emit('disconnect', namespace='/match')
+            game.gameover = True
 
         else:
             # Ask the other player to send a next move
-            ask_nextmove(game.clients[1 - color].sid)
+            ask_nextmove(1 - color)
 
     static_files = {
         '/': './index.html',

@@ -29,11 +29,18 @@
                 });
 
                 record.scrollTop = record.scrollHeight * Math.max(ply - 1, 0) / ply;
+
+                var timelimit = data['timelimit'];
+
+                document.getElementById("btime").innerHTML = "先手残り " + timelimit['btime'] + " 秒 秒読み " + timelimit['bbyoyomi'] + " 秒";
+                document.getElementById("wtime").innerHTML = "後手残り " + timelimit['wtime'] + " 秒 秒読み " + timelimit['wbyoyomi'] + " 秒";
             });
 
             var display = function() {
                 socket.emit('view');
             };
+
+            setInterval(display, 700);
         </script>
     </head>
 
@@ -47,10 +54,8 @@
                 </select>
             </div>
 
-            <div id="time">
-                先手残り X分 <br>
-                後手残り Y分
-            </div>
+            <div id="btime"></div>
+            <div id="wtime"></div>
         </div>
     </body>
 </html>
