@@ -53,7 +53,6 @@ def main(port, config_json):
             'byoyomi': game.byoyomi * 1000
         }
 
-        print('send nextmove to {}'.format(sid))
         sio.emit('nextmove', data, namespace='/match', room=sid)
 
         game.stopwatch[color] = time.time()
@@ -130,8 +129,6 @@ def main(port, config_json):
 
     @sio.on('bestmove', namespace='/match')
     def bestmove(sid, data):
-        print('get bestmove from {}'.format(sid))
-
         color = game.position.get_side_to_move()
 
         # An unknown player sent 'bestmove' command, so discard it
