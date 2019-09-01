@@ -23,6 +23,7 @@ class Game:
         # Stopwatch
         self.stopwatch = [None for _ in range(2)]
 
+        self.ongoing = False
         self.gameover = False
 
 class Client:
@@ -72,6 +73,7 @@ def main(port, config_json):
             'kif': game.position.get_kif(),
             'timelimit': timelimit,
             'side_to_move': color,
+            'ongoing': game.ongoing,
             'gameover': game.gameover
         })
 
@@ -121,7 +123,10 @@ def main(port, config_json):
             sio.emit('usinewgame', namespace='/match', room=game.clients[1].sid)
 
             # Ask a first move
+            game.ongoing = True
             ask_nextmove(0)
+
+            display()
 
     @sio.on('bestmove', namespace='/match')
     def bestmove(sid, data):
@@ -151,15 +156,12 @@ def main(port, config_json):
 
         # time consumption
         current_time = time.time()
-        elapsed = current_time - game.stopwatch[color]
+        elapsed = math.ceil(current_time - game.stopwatch[color])
 
         if game.timelimit[color] > 0:
             m = min(game.timelimit[color], elapsed)
-            m = 1 if m < 1 else math.floor(m)
-
             game.timelimit[color] -= m
             elapsed -= m
-        elapsed = math.floor(elapsed)
 
         # ToDo: lose by timelimit
 

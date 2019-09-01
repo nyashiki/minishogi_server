@@ -15,6 +15,7 @@
             var timelimit = null;
             var side_to_move = 0;
             var think_start_time = null;
+            var ongoing = false;
             var gameover = false;
 
             socket.on("display", function(data) {
@@ -38,6 +39,7 @@
 
                 think_start_time = new Date().getTime();
 
+                ongoing = data["ongoing"];
                 gameover = data["gameover"];
             });
 
@@ -46,12 +48,12 @@
                 var byoyomi = timelimit["byoyomi"];
                 var current_time = new Date().getTime();
 
-                if (!gameover) {
+                if (ongoing && !gameover) {
                     var diff = current_time - think_start_time;
                     var elapsed_seconds = Math.ceil(diff / 1000);
 
                     if (remain_time > 0) {
-                        m = Math.max(1, Math.min(remain_time, elapsed_seconds));
+                        m = Math.min(remain_time, elapsed_seconds);
                         remain_time -= m;
                         elapsed_seconds -= m;
                     }
