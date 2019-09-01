@@ -160,32 +160,37 @@ def main(port, config_json):
             game.timelimit[color] -= m
             elapsed -= m
 
-        # ToDo: lose by timelimit
-
-        # Apply the sent move
-        game.position.do_move(move)
-
-        # Is the game end?
-        is_repetition, is_check_repetition = game.position.is_repetition()
-        legal_moves = game.position.generate_moves()
-        if is_check_repetition:
-            print('CHECK REPETITION')
-            sio.emit('disconnect', namespace='/match')
-            game.gameover = True
-
-        elif is_repetition:
-            print('REPETITION')
-            sio.emit('disconnect', namespace='/match')
-            game.gameover = True
-
-        elif len(legal_moves) == 0:
-            print('NO LEGAL MOVE')
+        # lose by timelimit
+        if elapsed >= game.byoyomi:
+            print('TIMEOUT')
             sio.emit('disconnect', namespace='/match')
             game.gameover = True
 
         else:
-            # Ask the other player to send a next move
-            ask_nextmove(1 - color)
+            # Apply the sent move
+            game.position.do_move(move)
+
+            # Is the game end?
+            is_repetition, is_check_repetition = game.position.is_repetition()
+            legal_moves = game.position.generate_moves()
+            if is_check_repetition:
+                print('CHECK REPETITION')
+                sio.emit('disconnect', namespace='/match')
+                game.gameover = True
+
+            elif is_repetition:
+                print('REPETITION')
+                sio.emit('disconnect', namespace='/match')
+                game.gameover = True
+
+            elif len(legal_moves) == 0:
+                print('NO LEGAL MOVE')
+                sio.emit('disconnect', namespace='/match')
+                game.gameover = True
+
+            else:
+                # Ask the other player to send a next move
+                ask_nextmove(1 - color)
 
         display()
 
@@ -194,6 +199,7 @@ def main(port, config_json):
         '/css/': './css/',
         '/js/': './js/'
     }
+
     app = socketio.WSGIApp(sio, static_files=static_files)
     eventlet.wsgi.server(eventlet.listen(('', port)), app)
 
