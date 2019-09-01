@@ -71,7 +71,7 @@ def main(ip, port, config_json):
     @sio.on('error', namespace='/match')
     def error(message):
         print('ERROR: {}'.format(message))
-        exit(0)
+        os._exit(0)
 
     @sio.on('info', namespace='/match')
     def info(message):
