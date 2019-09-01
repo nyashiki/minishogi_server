@@ -161,7 +161,7 @@ def main(port, config_json):
             elapsed -= m
 
         # lose by timelimit
-        if elapsed >= game.byoyomi:
+        if elapsed > game.byoyomi:
             print('TIMEOUT')
             sio.emit('disconnect', namespace='/match')
             game.gameover = True
