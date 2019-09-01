@@ -191,7 +191,8 @@ def main(port, config_json):
 
     static_files = {
         '/': './index.html',
-        '/css/': './css/'
+        '/css/': './css/',
+        '/js/': './js/'
     }
     app = socketio.WSGIApp(sio, static_files=static_files)
     eventlet.wsgi.server(eventlet.listen(('', port)), app)
