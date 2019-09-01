@@ -10,7 +10,8 @@ import time
 
 class Game:
     def __init__(self):
-        self.position = None
+        self.position = minishogilib.Position()
+        self.position.set_start_position()
 
         # Time limit
         self.timelimit = [0 for _ in range(2)]
@@ -56,45 +57,27 @@ def main(port, config_json):
 
         game.stopwatch[color] = time.time()
 
-    def display(sid):
-        if game.position is None:
-            return
-
+    def display():
         # about timelimit
         color = game.position.get_side_to_move()
 
-        timelimit = [game.timelimit[0], game.timelimit[1]]
-        byoyomi = game.byoyomi
-
-        current_time = time.time()
-        elapsed = 0 if game.gameover or game.stopwatch[color] is None else current_time - game.stopwatch[color]
-
-        if elapsed > 0 and game.timelimit[color] > 0:
-            m = min(timelimit[color], elapsed)
-            m = 1 if m < 1 else math.floor(m)
-
-            timelimit[color] -= m
-            elapsed -= m
-
-        elapsed = max(0, math.floor(elapsed))
-        byoyomi -= elapsed
-
         timelimit  = {
-            'btime': timelimit[0],
-            'wtime': timelimit[1],
-            'bbyoyomi': byoyomi if color == 0 else game.byoyomi,
-            'wbyoyomi': byoyomi if color == 1 else game.byoyomi
+            'btime': game.timelimit[0],
+            'wtime': game.timelimit[1],
+            'byoyomi': game.byoyomi
         }
 
         sio.emit('display', {
             'svg': None if game.position is None else game.position.to_svg(),
             'kif': game.position.get_kif(),
-            'timelimit': timelimit
+            'timelimit': timelimit,
+            'side_to_move': color,
+            'gameover': game.gameover
         })
 
-    @sio.on('view')
-    def view(sid, data=None):
-        display(sid)
+    @sio.event
+    def connect(sid, data=None):
+        display()
 
     @sio.on('usi', namespace='/match')
     def usi(sid, data):
@@ -126,8 +109,6 @@ def main(port, config_json):
             # Call isready and usinewgame
             sio.emit('isready', namespace='/match', room=game.clients[0].sid)
             sio.emit('isready', namespace='/match', room=game.clients[1].sid)
-
-    # ToDo: @sio.event disconnect()
 
     @sio.on('readyok', namespace='/match')
     def readyok(sid, data=None):
@@ -206,6 +187,8 @@ def main(port, config_json):
         else:
             # Ask the other player to send a next move
             ask_nextmove(1 - color)
+
+        display()
 
     static_files = {
         '/': './index.html',
