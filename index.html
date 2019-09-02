@@ -8,19 +8,22 @@
 
         <link rel="stylesheet" href="./css/style.css">
         <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/2.2.0/socket.io.js"></script>
+        <script src="http://danml.com/js/download.js"></script>
         <script src="./js/display.js"></script>
     </head>
 
     <body>
-        <div>
-            <div>
-                <div id="board">
-                </div>
-
-                <select id="record" size="10">
-                </select>
+        <div class="block">
+            <div id="board" class="cell">
             </div>
 
+            <div class="cell">
+                <select id="record" size="10">
+                </select>
+                <input type="button" id="download" value="Download CSA" onclick="download_csa()" />
+            </div>
+        </div>
+        <div class="block">
             <div id="btime"></div>
             <div id="wtime"></div>
         </div>

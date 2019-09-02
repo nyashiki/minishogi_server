@@ -61,4 +61,11 @@ var display = function() {
     }
 };
 
+var download_csa = function() {
+    socket.emit("download", function (data) {
+        console.log(data);
+        download(data["kif"], data["filename"], "text/plain");
+    });
+};
+
 setInterval(display, 900);
