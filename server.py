@@ -26,10 +26,12 @@ class Game:
         self.ongoing = False
         self.gameover = False
 
+
 class Client:
     def __init__(self):
         self.sid = None
         self.readyok = False
+
 
 def main(port, config_json):
     game = Game()
@@ -61,7 +63,7 @@ def main(port, config_json):
         # about timelimit
         color = game.position.get_side_to_move()
 
-        timelimit  = {
+        timelimit = {
             'btime': game.timelimit[0],
             'wtime': game.timelimit[1],
             'byoyomi': game.byoyomi
@@ -69,7 +71,7 @@ def main(port, config_json):
 
         sio.emit('display', {
             'svg': None if game.position is None else game.position.to_svg(),
-            'kif': game.position.get_kif(),
+            'kif': game.position.get_csa_kif(),
             'timelimit': timelimit,
             'side_to_move': color,
             'ongoing': game.ongoing,
@@ -83,15 +85,18 @@ def main(port, config_json):
     @sio.on('usi', namespace='/match')
     def usi(sid, data):
         if len(game.clients) >= 2:
-            sio.emit('error', 'The game has already started.', namespace='/match', room=sid)
+            sio.emit('error', 'The game has already started.',
+                     namespace='/match', room=sid)
             return
 
         if not 'name' in data:
-            sio.emit('error', 'You sent a request but name field was None.', namespace='/match', room=sid)
+            sio.emit('error', 'You sent a request but name field was None.',
+                     namespace='/match', room=sid)
             return
 
         if not 'author' in data:
-            sio.emit('error', 'You sent a request but author field was None.', namespace='/match', room=sid)
+            sio.emit('error', 'You sent a request but author field was None.',
+                     namespace='/match', room=sid)
             return
 
         client = Client()
@@ -118,8 +123,10 @@ def main(port, config_json):
                 client.readyok = True
 
         if game.clients[0].readyok and game.clients[1].readyok:
-            sio.emit('usinewgame', namespace='/match', room=game.clients[0].sid)
-            sio.emit('usinewgame', namespace='/match', room=game.clients[1].sid)
+            sio.emit('usinewgame', namespace='/match',
+                     room=game.clients[0].sid)
+            sio.emit('usinewgame', namespace='/match',
+                     room=game.clients[1].sid)
 
             # Ask a first move
             game.ongoing = True
@@ -187,6 +194,7 @@ def main(port, config_json):
                 print('NO LEGAL MOVE')
                 sio.emit('disconnect', namespace='/match')
                 game.gameover = True
+                save_csa(game.position.get_csa_kif())
 
             else:
                 # Ask the other player to send a next move
@@ -203,10 +211,37 @@ def main(port, config_json):
     app = socketio.WSGIApp(sio, static_files=static_files)
     eventlet.wsgi.server(eventlet.listen(('', port)), app)
 
+
+def init_csa(f, sente, gote):
+    f.write("V2.2\n")
+    f.write("N+" + sente + "\n")
+    f.write("N-" + gote + "\n")
+    f.write("P1-HI-KA-GI-KI-OU\n")
+    f.write("P2 *  *  *  * -FU\n")
+    f.write("P3 *  *  *  *  * \n")
+    f.write("P4+FU *  *  *  * \n")
+    f.write("P5+OU+KI+GI+KA+HI\n")
+    f.write("+\n")
+
+
+def save_csa(kif):
+    with open("test.csa", 'w') as f:
+        init_csa(f, "", "")
+        f.write("+\n")
+        for i in range(len(kif)):
+            if i & 1:
+                f.write("-" + kif[i] + "\n")
+            else:
+                f.write("+" + kif[i] + "\n")
+        f.write("%TORYO")
+
+
 if __name__ == '__main__':
     parser = OptionParser()
-    parser.add_option('-c', '--config', dest='config_json', help='confile json file', default='./server.json')
-    parser.add_option('-p', '--port', dest='port', help='target port', type='int', default=8000)
+    parser.add_option('-c', '--config', dest='config_json',
+                      help='confile json file', default='./server.json')
+    parser.add_option('-p', '--port', dest='port',
+                      help='target port', type='int', default=8000)
 
     (options, args) = parser.parse_args()
 
