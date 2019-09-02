@@ -1,3 +1,4 @@
+import datetime
 import eventlet
 import math
 import minishogilib
@@ -18,7 +19,7 @@ class Game:
         self.byoyomi = 0
 
         # Clients
-        self.clients = []
+        self.clients = [None for _ in range(2)]
 
         # Stopwatch
         self.stopwatch = [None for _ in range(2)]
@@ -30,8 +31,32 @@ class Game:
 class Client:
     def __init__(self):
         self.sid = None
+        self.name = ""
         self.readyok = False
 
+def dump_csa(game):
+    data = []
+
+    data.append('V2.2')
+    data.append('N+{}'.format("" if game.clients[0] is None else game.clients[0].name))
+    data.append('N-{}'.format("" if game.clients[1] is None else game.clients[1].name))
+    data.append('P1-HI-KA-GI-KI-OU')
+    data.append('P2 *  *  *  * -FU')
+    data.append('P3 *  *  *  *  * ')
+    data.append('P4+FU *  *  *  * ')
+    data.append('P5+OU+KI+GI+KA+HI')
+    data.append('+')
+
+    csa_kif = game.position.get_csa_kif()
+
+    for (ply, kif) in enumerate(csa_kif):
+        if ply % 2 == 0:
+            data.append('+{}'.format(kif))
+        else:
+            data.append('-{}'.format(kif))
+
+    # ToDo: Resign, Timeout, or Disconnect
+    return '\n'.join(data)
 
 def main(port, config_json):
     game = Game()
@@ -82,9 +107,22 @@ def main(port, config_json):
     def connect(sid, data=None):
         display()
 
+    @sio.on('download')
+    def download(sid, data=None):
+        current_time = '{0:%Y-%m-%d-%H%M%S}'.format(datetime.datetime.now())
+
+        data = {
+            'kif': dump_csa(game),
+            'filename': '{}_{}_{}.CSA'.format(current_time,
+                                              "Player1" if game.clients[0] is None else game.clients[0].name,
+                                              "Player2" if game.clients[1] is None else game.clients[1].name)
+        }
+
+        return data, 200
+
     @sio.on('usi', namespace='/match')
     def usi(sid, data):
-        if len(game.clients) >= 2:
+        if game.clients[1] is not None:
             sio.emit('error', 'The game has already started.',
                      namespace='/match', room=sid)
             return
@@ -101,8 +139,12 @@ def main(port, config_json):
 
         client = Client()
         client.sid = sid
+        client.name = data['name']
 
-        game.clients.append(client)
+        if game.clients[0] is None:
+            game.clients[0] = client
+        else:
+            game.clients[1] = client
 
         sio.emit('info', 'Correctly accepted.', namespace='/match', room=sid)
 
@@ -194,7 +236,6 @@ def main(port, config_json):
                 print('NO LEGAL MOVE')
                 sio.emit('disconnect', namespace='/match')
                 game.gameover = True
-                save_csa(game.position.get_csa_kif())
 
             else:
                 # Ask the other player to send a next move
@@ -210,31 +251,6 @@ def main(port, config_json):
 
     app = socketio.WSGIApp(sio, static_files=static_files)
     eventlet.wsgi.server(eventlet.listen(('', port)), app)
-
-
-def init_csa(f, sente, gote):
-    f.write("V2.2\n")
-    f.write("N+" + sente + "\n")
-    f.write("N-" + gote + "\n")
-    f.write("P1-HI-KA-GI-KI-OU\n")
-    f.write("P2 *  *  *  * -FU\n")
-    f.write("P3 *  *  *  *  * \n")
-    f.write("P4+FU *  *  *  * \n")
-    f.write("P5+OU+KI+GI+KA+HI\n")
-    f.write("+\n")
-
-
-def save_csa(kif):
-    with open("test.csa", 'w') as f:
-        init_csa(f, "", "")
-        f.write("+\n")
-        for i in range(len(kif)):
-            if i & 1:
-                f.write("-" + kif[i] + "\n")
-            else:
-                f.write("+" + kif[i] + "\n")
-        f.write("%TORYO")
-
 
 if __name__ == '__main__':
     parser = OptionParser()
