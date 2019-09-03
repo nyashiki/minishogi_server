@@ -37,6 +37,7 @@ class Client:
         self.sid = None
         self.name = ""
         self.readyok = False
+        self.disconnect = False
 
 def dump_csa(game):
     data = []
@@ -87,8 +88,11 @@ def main(port, config_json):
         game.stopwatch[color] = time.time()
 
     def quit_engine(sio, game):
-        sio.emit('disconnect', namespace='/match', room=game.clients[0].sid)
-        sio.emit('disconnect', namespace='/match', room=game.clients[1].sid)
+        if game.clients[0] is not None:
+            sio.emit('disconnect', namespace='/match', room=game.clients[0].sid)
+
+        if game.clients[1] is not None:
+            sio.emit('disconnect', namespace='/match', room=game.clients[1].sid)
 
     def display(game):
         # about timelimit
@@ -128,7 +132,20 @@ def main(port, config_json):
     @sio.event
     def disconnect(sid, data=None):
         for game in games:
-            game.viewers = list(filter(lambda x: x != sid, game.viewers))
+            if game.clients[0] is not None and game.clients[0].sid == sid:
+                game.clients[0].disconnect = True
+                game.gameover = 'DISCONNECT'
+                game.ongoing = False
+                quit_engine(sio, game)
+
+            elif game.clients[1] is not None and game.clients[1].sid == sid:
+                game.clients[1].disconnect = True
+                game.gameover = 'DISCONNECT'
+                game.ongoing = False
+                quit_engine(sio, game)
+
+            else:
+                game.viewers = list(filter(lambda x: x != sid, game.viewers))
 
     @sio.on('download')
     def download(sid, id):
@@ -166,7 +183,7 @@ def main(port, config_json):
     def usi(sid, data):
         target_game = None
         for game in games:
-            if game.clients[1] is None:
+            if game.gameover == '' and game.clients[1] is None:
                 target_game = game
                 break
 
@@ -255,6 +272,7 @@ def main(port, config_json):
             print('RESIGN')
             quit_engine(sio, game)
             game.gameover = 'TORYO'
+            game.ongoing = False
             display(game)
             return
 
@@ -264,6 +282,7 @@ def main(port, config_json):
             print('ILLEGAL MOVE')
             quit_engine(sio, game)
             game.gameover = 'ILLEGAL_MOVE'
+            game.ongoing = False
             display(game)
             return
 
@@ -282,6 +301,7 @@ def main(port, config_json):
         if elapsed > game.byoyomi:
             print('TIMEOUT')
             quit_engine(sio, game)
+            game.ongoing = False
             game.gameover = 'TIME_UP'
 
         else:
@@ -294,11 +314,13 @@ def main(port, config_json):
             if is_check_repetition:
                 print('CHECK REPETITION')
                 quit_engine(sio, game)
+                game.ongoing = False
                 game.gameover = 'ILLEGAL_MOVE'
 
             elif is_repetition:
                 print('REPETITION')
                 quit_engine(sio, game)
+                game.ongoing = False
                 game.gameover = 'SENNICHITE'
 
             else:
