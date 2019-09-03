@@ -37,7 +37,7 @@ var display = function() {
     var byoyomi = timelimit["byoyomi"];
     var current_time = new Date().getTime();
 
-    if (ongoing && gameover != "") {
+    if (ongoing && gameover == "") {
         var diff = current_time - think_start_time;
         var elapsed_seconds = Math.ceil(diff / 1000);
 
