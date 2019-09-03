@@ -114,7 +114,7 @@ def main(port, config_json):
 
         data = {
             'kif': dump_csa(game),
-            'filename': '{}_{}_{}.CSA'.format(current_time,
+            'filename': '{}_{}_{}.csa'.format(current_time,
                                               "Player1" if game.clients[0] is None else game.clients[0].name,
                                               "Player2" if game.clients[1] is None else game.clients[1].name)
         }
