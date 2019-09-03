@@ -112,7 +112,7 @@ def main(port, config_json):
                 'side_to_move': color,
                 'ongoing': game.ongoing,
                 'gameover': game.gameover
-            }, sid=viewer)
+            }, room=viewer)
 
     @sio.event
     def connect(sid, data=None):
