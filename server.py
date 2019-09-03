@@ -86,6 +86,10 @@ def main(port, config_json):
 
         game.stopwatch[color] = time.time()
 
+    def quit_engine(sio, game):
+        sio.emit('disconnect', namespace='/match', room=game.clients[0].sid)
+        sio.emit('disconnect', namespace='/match', room=game.clients[1].sid)
+
     def display(game):
         # about timelimit
         color = game.position.get_side_to_move()
@@ -113,14 +117,17 @@ def main(port, config_json):
     @sio.event
     def connect(sid, data=None):
         if 'HTTP_REFERER' in data:
-            id = data['HTTP_REFERER'].split('?')[1]
+            split = data['HTTP_REFERER'].split('?')
 
-            for game in games:
-                if id == str(game.id):
-                    game.viewers.append(sid)
-                    display(game)
+            if len(split) > 1:
+                id = split[1]
 
-                    break
+                for game in games:
+                    if id == str(game.id):
+                        game.viewers.append(sid)
+                        display(game)
+
+                        break
 
     @sio.event
     def disconnect(sid, data=None):
@@ -143,6 +150,21 @@ def main(port, config_json):
 
                 return data, 200
 
+    @sio.on('matching')
+    def matching(sid):
+        data = []
+
+        for game in reversed(games):
+            game_data = {
+                'gameover': game.gameover,
+                'link': './view?{}'.format(game.id),
+                'player1': "Player1" if game.clients[0] is None else game.clients[0].name,
+                "player2": "Player2" if game.clients[1] is None else game.clients[1].name
+            }
+
+            data.append(game_data)
+        return data
+
     @sio.on('usi', namespace='/match')
     def usi(sid, data):
         target_game = None
@@ -156,12 +178,12 @@ def main(port, config_json):
             game.timelimit[0] = config['btime'] // 1000
             game.timelimit[1] = config['wtime'] // 1000
             game.byoyomi = config['byoyomi'] // 1000
-
             game.id = uuid.uuid4()
+
+            games.append(game)
         else:
             game = target_game
 
-        games.append(game)
         sid_game[sid] = game
 
         if game.clients[1] is not None:
@@ -234,7 +256,7 @@ def main(port, config_json):
 
         if sfen_move == 'resign':
             print('RESIGN')
-            sio.emit('disconnect', namespace='/match')
+            quit_engine(sio, game)
             game.gameover = 'TORYO'
             display(game)
             return
@@ -243,7 +265,7 @@ def main(port, config_json):
         legal_moves = game.position.generate_moves()
         if not sfen_move in [m.sfen() for m in legal_moves]:
             print('ILLEGAL MOVE')
-            sio.emit('disconnect', namespace='/match')
+            quit_engine(sio, game)
             game.gameover = 'ILLEGAL_MOVE'
             display(game)
             return
@@ -262,7 +284,7 @@ def main(port, config_json):
         # lose by timelimit
         if elapsed > game.byoyomi:
             print('TIMEOUT')
-            sio.emit('disconnect', namespace='/match')
+            quit_engine(sio, game)
             game.gameover = 'TIME_UP'
 
         else:
@@ -274,12 +296,12 @@ def main(port, config_json):
             legal_moves = game.position.generate_moves()
             if is_check_repetition:
                 print('CHECK REPETITION')
-                sio.emit('disconnect', namespace='/match')
+                quit_engine(sio, game)
                 game.gameover = 'ILLEGAL_MOVE'
 
             elif is_repetition:
                 print('REPETITION')
-                sio.emit('disconnect', namespace='/match')
+                quit_engine(sio, game)
                 game.gameover = 'SENNICHITE'
 
             else:
@@ -289,6 +311,7 @@ def main(port, config_json):
         display(game)
 
     static_files = {
+        '/': './index.html',
         '/view': './view.html',
         '/css/': './css/',
         '/js/': './js/'
