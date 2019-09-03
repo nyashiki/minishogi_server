@@ -25,7 +25,7 @@ class Game:
         self.stopwatch = [None for _ in range(2)]
 
         self.ongoing = False
-        self.gameover = False
+        self.gameover = ''  # TORYO, SENNICHITE, TIME_UP, or ILLEGAL_MOVE
 
 
 class Client:
@@ -55,7 +55,8 @@ def dump_csa(game):
         else:
             data.append('-{}'.format(kif))
 
-    # ToDo: Resign, Timeout, or Disconnect
+    data.append('%{}'.format(game.gameover))
+
     return '\n'.join(data)
 
 def main(port, config_json):
@@ -148,7 +149,7 @@ def main(port, config_json):
 
         sio.emit('info', 'Correctly accepted.', namespace='/match', room=sid)
 
-        if len(game.clients) == 2:
+        if game.clients[0] is not None and game.clients[1] is not None:
             # Two players sit down, so a game is starting.
             # Initialization
             game.position = minishogilib.Position()
@@ -189,7 +190,9 @@ def main(port, config_json):
         if sfen_move == 'resign':
             print('RESIGN')
             sio.emit('disconnect', namespace='/match')
-            game.gameover = True
+            game.gameover = 'TORYO'
+            display()
+            return
 
         move = game.position.sfen_to_move(sfen_move)
 
@@ -198,7 +201,7 @@ def main(port, config_json):
         if not move.sfen() in [m.sfen() for m in legal_moves]:
             print('ILLEGAL MOVE')
             sio.emit('disconnect', namespace='/match')
-            game.gameover = True
+            game.gameover = 'ILLEGAL_MOVE'
 
         # time consumption
         current_time = time.time()
@@ -213,7 +216,7 @@ def main(port, config_json):
         if elapsed > game.byoyomi:
             print('TIMEOUT')
             sio.emit('disconnect', namespace='/match')
-            game.gameover = True
+            game.gameover = 'TIME_UP'
 
         else:
             # Apply the sent move
@@ -225,17 +228,12 @@ def main(port, config_json):
             if is_check_repetition:
                 print('CHECK REPETITION')
                 sio.emit('disconnect', namespace='/match')
-                game.gameover = True
+                game.gameover = 'ILLEGAL_MOVE'
 
             elif is_repetition:
                 print('REPETITION')
                 sio.emit('disconnect', namespace='/match')
-                game.gameover = True
-
-            elif len(legal_moves) == 0:
-                print('NO LEGAL MOVE')
-                sio.emit('disconnect', namespace='/match')
-                game.gameover = True
+                game.gameover = 'SENNICHITE'
 
             else:
                 # Ask the other player to send a next move
