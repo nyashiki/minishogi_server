@@ -111,10 +111,6 @@ def main(port, config_json):
             }, sid=viewer)
 
     @sio.event
-    def begin_chat(sid, id):
-        sio.enter_room(sid, id)
-
-    @sio.event
     def connect(sid, data=None):
         if 'HTTP_REFERER' in data:
             split = data['HTTP_REFERER'].split('?')
@@ -157,6 +153,7 @@ def main(port, config_json):
         for game in reversed(games):
             game_data = {
                 'gameover': game.gameover,
+                'ongoing': game.ongoing,
                 'link': './view?{}'.format(game.id),
                 'player1': "Player1" if game.clients[0] is None else game.clients[0].name,
                 "player2": "Player2" if game.clients[1] is None else game.clients[1].name
