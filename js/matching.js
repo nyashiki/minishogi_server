@@ -10,12 +10,14 @@ var get_matching = function() {
         data.forEach(function(element) {
             var target = null;
 
-            if (element["ongoing"] == false) {
-                target = document.getElementById("pending");
-            } else if (element["gameover"] == "") {
+            if (element["ongoing"] == true) {
                 target = document.getElementById("ongoing");
             } else {
-                target = document.getElementById("finished");
+                if (element["gameover"] == "") {
+                    target = document.getElementById("pending");
+                } else {
+                    target = document.getElementById("finished");
+                }
             }
 
             var list = document.createElement("li");
