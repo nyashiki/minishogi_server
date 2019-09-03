@@ -134,13 +134,15 @@ def main(port, config_json):
         for game in games:
             if game.clients[0] is not None and game.clients[0].sid == sid:
                 game.clients[0].disconnect = True
-                game.gameover = 'DISCONNECT'
+                if game.gameover == '':
+                    game.gameover = 'DISCONNECT'
                 game.ongoing = False
                 quit_engine(sio, game)
 
             elif game.clients[1] is not None and game.clients[1].sid == sid:
                 game.clients[1].disconnect = True
-                game.gameover = 'DISCONNECT'
+                if game.gameover = '':
+                    game.gameover = 'DISCONNECT'
                 game.ongoing = False
                 quit_engine(sio, game)
 
