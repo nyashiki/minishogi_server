@@ -7,10 +7,13 @@ import os
 import simplejson as json
 import socketio
 import time
+import uuid
 
 
 class Game:
     def __init__(self):
+        self.id = None
+
         self.position = minishogilib.Position()
         self.position.set_start_position()
 
@@ -60,18 +63,18 @@ def dump_csa(game):
     return '\n'.join(data)
 
 def main(port, config_json):
-    game = Game()
-
     with open(config_json) as f:
         config = json.load(f)
 
-    game.timelimit[0] = config['btime'] // 1000
-    game.timelimit[1] = config['wtime'] // 1000
-    game.byoyomi = config['byoyomi'] // 1000
+    games = []
+
+    sid_game = {
+
+    }
 
     sio = socketio.Server()
 
-    def ask_nextmove(color):
+    def ask_nextmove(game, color):
         sid = game.clients[color].sid
 
         data = {
@@ -85,7 +88,7 @@ def main(port, config_json):
 
         game.stopwatch[color] = time.time()
 
-    def display():
+    def display(game):
         # about timelimit
         color = game.position.get_side_to_move()
 
@@ -106,10 +109,12 @@ def main(port, config_json):
 
     @sio.event
     def connect(sid, data=None):
-        display()
+        if len(games) > 0:
+            display(games[0])
 
     @sio.on('download')
     def download(sid, data=None):
+        # ToDo: Game = ...
         current_time = '{0:%Y-%m-%d-%H%M%S}'.format(datetime.datetime.now())
 
         data = {
@@ -123,6 +128,27 @@ def main(port, config_json):
 
     @sio.on('usi', namespace='/match')
     def usi(sid, data):
+        print('COME HERE! {}'.format(sid))
+
+        target_game = None
+        for game in games:
+            if game.clients[1] is None:
+                target_game = game
+                break
+
+        if target_game is None:
+            game = Game()
+            game.timelimit[0] = config['btime'] // 1000
+            game.timelimit[1] = config['wtime'] // 1000
+            game.byoyomi = config['byoyomi'] // 1000
+
+            game.id = uuid.uuid4()
+        else:
+            game = target_game
+
+        games.append(game)
+        sid_game[sid] = game
+
         if game.clients[1] is not None:
             sio.emit('error', 'The game has already started.',
                      namespace='/match', room=sid)
@@ -161,6 +187,8 @@ def main(port, config_json):
 
     @sio.on('readyok', namespace='/match')
     def readyok(sid, data=None):
+        game = sid_game[sid]
+
         for client in game.clients:
             if client.sid == sid:
                 client.readyok = True
@@ -173,12 +201,14 @@ def main(port, config_json):
 
             # Ask a first move
             game.ongoing = True
-            ask_nextmove(0)
+            ask_nextmove(game, 0)
 
-            display()
+            display(game)
 
     @sio.on('bestmove', namespace='/match')
     def bestmove(sid, data):
+        game = sid_game[sid]
+
         color = game.position.get_side_to_move()
 
         # An unknown player sent 'bestmove' command, so discard it
@@ -191,17 +221,19 @@ def main(port, config_json):
             print('RESIGN')
             sio.emit('disconnect', namespace='/match')
             game.gameover = 'TORYO'
-            display()
+            display(game)
             return
-
-        move = game.position.sfen_to_move(sfen_move)
 
         # check whether the sent move is legal
         legal_moves = game.position.generate_moves()
-        if not move.sfen() in [m.sfen() for m in legal_moves]:
+        if not sfen_move in [m.sfen() for m in legal_moves]:
             print('ILLEGAL MOVE')
             sio.emit('disconnect', namespace='/match')
             game.gameover = 'ILLEGAL_MOVE'
+            display(game)
+            return
+
+        move = game.position.sfen_to_move(sfen_move)
 
         # time consumption
         current_time = time.time()
@@ -237,9 +269,9 @@ def main(port, config_json):
 
             else:
                 # Ask the other player to send a next move
-                ask_nextmove(1 - color)
+                ask_nextmove(game, 1 - color)
 
-        display()
+        display(game)
 
     static_files = {
         '/': './index.html',
