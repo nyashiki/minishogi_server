@@ -1,4 +1,6 @@
 var url = window.location.protocol + "//" + window.location.host + "/";
+var id = window.location.search.slice(1);
+
 var socket = io(url);
 
 var timelimit = null;
@@ -33,36 +35,38 @@ socket.on("display", function(data) {
 });
 
 var display = function() {
-    var remain_time = side_to_move == 0? timelimit["btime"] : timelimit["wtime"];
-    var byoyomi = timelimit["byoyomi"];
-    var current_time = new Date().getTime();
+    if (timelimit != null) {
+        var remain_time = side_to_move == 0? timelimit["btime"] : timelimit["wtime"];
+        var byoyomi = timelimit["byoyomi"];
+        var current_time = new Date().getTime();
 
-    if (ongoing && gameover == "") {
-        var diff = current_time - think_start_time;
-        var elapsed_seconds = Math.ceil(diff / 1000);
+        if (ongoing && gameover == "") {
+            var diff = current_time - think_start_time;
+            var elapsed_seconds = Math.ceil(diff / 1000);
 
-        if (remain_time > 0) {
-            m = Math.min(remain_time, elapsed_seconds);
-            remain_time -= m;
-            elapsed_seconds -= m;
+            if (remain_time > 0) {
+                m = Math.min(remain_time, elapsed_seconds);
+                remain_time -= m;
+                elapsed_seconds -= m;
+            }
+
+            if (elapsed_seconds > 0) {
+                byoyomi -= Math.ceil(elapsed_seconds);
+            }
         }
 
-        if (elapsed_seconds > 0) {
-            byoyomi -= Math.ceil(elapsed_seconds);
+        if (side_to_move == 0) {
+            document.getElementById("btime").innerHTML = "先手残り " + remain_time + " 秒 秒読み " + byoyomi + " 秒";
+            document.getElementById("wtime").innerHTML = "後手残り " + timelimit["wtime"] + " 秒 秒読み " + timelimit["byoyomi"] + " 秒";
+        } else {
+            document.getElementById("btime").innerHTML = "先手残り " + timelimit["btime"] + " 秒 秒読み " + timelimit["byoyomi"] + " 秒";
+            document.getElementById("wtime").innerHTML = "後手残り " + remain_time + " 秒 秒読み " + byoyomi + " 秒";
         }
-    }
-
-    if (side_to_move == 0) {
-        document.getElementById("btime").innerHTML = "先手残り " + remain_time + " 秒 秒読み " + byoyomi + " 秒";
-        document.getElementById("wtime").innerHTML = "後手残り " + timelimit["wtime"] + " 秒 秒読み " + timelimit["byoyomi"] + " 秒";
-    } else {
-        document.getElementById("btime").innerHTML = "先手残り " + timelimit["btime"] + " 秒 秒読み " + timelimit["byoyomi"] + " 秒";
-        document.getElementById("wtime").innerHTML = "後手残り " + remain_time + " 秒 秒読み " + byoyomi + " 秒";
     }
 };
 
 var download_csa = function() {
-    socket.emit("download", function (data) {
+    socket.emit("download", id, function (data) {
         download(data["kif"], data["filename"], "text/plain");
     });
 };

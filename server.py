@@ -30,6 +30,7 @@ class Game:
         self.ongoing = False
         self.gameover = ''  # TORYO, SENNICHITE, TIME_UP, or ILLEGAL_MOVE
 
+        self.viewers = []
 
 class Client:
     def __init__(self):
@@ -67,10 +68,7 @@ def main(port, config_json):
         config = json.load(f)
 
     games = []
-
-    sid_game = {
-
-    }
+    sid_game = { }
 
     sio = socketio.Server()
 
@@ -98,38 +96,55 @@ def main(port, config_json):
             'byoyomi': game.byoyomi
         }
 
-        sio.emit('display', {
-            'svg': None if game.position is None else game.position.to_svg(),
-            'kif': game.position.get_csa_kif(),
-            'timelimit': timelimit,
-            'side_to_move': color,
-            'ongoing': game.ongoing,
-            'gameover': game.gameover
-        })
+        for viewer in game.viewers:
+            sio.emit('display', {
+                'svg': None if game.position is None else game.position.to_svg(),
+                'kif': game.position.get_csa_kif(),
+                'timelimit': timelimit,
+                'side_to_move': color,
+                'ongoing': game.ongoing,
+                'gameover': game.gameover
+            }, sid=viewer)
+
+    @sio.event
+    def begin_chat(sid, id):
+        sio.enter_room(sid, id)
 
     @sio.event
     def connect(sid, data=None):
-        if len(games) > 0:
-            display(games[0])
+        if 'HTTP_REFERER' in data:
+            id = data['HTTP_REFERER'].split('?')[1]
+
+            for game in games:
+                if id == str(game.id):
+                    game.viewers.append(sid)
+                    display(game)
+
+                    break
+
+    @sio.event
+    def disconnect(sid, data=None):
+        for game in games:
+            game.viewers = list(filter(lambda x: x != sid, game.viewers))
 
     @sio.on('download')
-    def download(sid, data=None):
-        # ToDo: Game = ...
-        current_time = '{0:%Y-%m-%d-%H%M%S}'.format(datetime.datetime.now())
+    def download(sid, id):
+        for game in games:
+            if id == str(game.id):
+                # ToDo: Game = ...
+                current_time = '{0:%Y-%m-%d-%H%M%S}'.format(datetime.datetime.now())
 
-        data = {
-            'kif': dump_csa(game),
-            'filename': '{}_{}_{}.csa'.format(current_time,
-                                              "Player1" if game.clients[0] is None else game.clients[0].name,
-                                              "Player2" if game.clients[1] is None else game.clients[1].name)
-        }
+                data = {
+                    'kif': dump_csa(game),
+                    'filename': '{}_{}_{}.csa'.format(current_time,
+                                                    "Player1" if game.clients[0] is None else game.clients[0].name,
+                                                    "Player2" if game.clients[1] is None else game.clients[1].name)
+                }
 
-        return data, 200
+                return data, 200
 
     @sio.on('usi', namespace='/match')
     def usi(sid, data):
-        print('COME HERE! {}'.format(sid))
-
         target_game = None
         for game in games:
             if game.clients[1] is None:
@@ -274,7 +289,7 @@ def main(port, config_json):
         display(game)
 
     static_files = {
-        '/': './index.html',
+        '/view': './view.html',
         '/css/': './css/',
         '/js/': './js/'
     }
