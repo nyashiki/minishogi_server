@@ -72,8 +72,8 @@ def main(port, config_json):
     with open(config_json) as f:
         config = json.load(f)
 
-    games = []
-    sid_game = { }
+    games = []  # Hosting games
+    sid_game = { }  # Which game is this sid's player playing?
 
     sio = socketio.Server()
 
@@ -104,6 +104,7 @@ def main(port, config_json):
                                             "Player1" if game.clients[0] is None else game.clients[0].name,
                                             "Player2" if game.clients[1] is None else game.clients[1].name)
 
+            # Replace not allowed characters for filename
             filename = (filename.replace(' ', '-')
                                 .replace(';', '')
                                 .replace(':', '')
@@ -140,6 +141,9 @@ def main(port, config_json):
                 'gameover': game.gameover
             }, room=viewer)
 
+    # #########################################################################################
+    # Socket-IO Events BEGIN
+    # #########################################################################################
     @sio.event
     def connect(sid, data=None):
         if 'HTTP_REFERER' in data:
@@ -173,13 +177,13 @@ def main(port, config_json):
                 quit_engine(sio, game)
 
             else:
+                # Someone leave the room of a game
                 game.viewers = list(filter(lambda x: x != sid, game.viewers))
 
     @sio.on('download')
     def download(sid, id):
         for game in games:
             if id == str(game.id):
-                # ToDo: Game = ...
                 current_time = '{0:%Y-%m-%d-%H%M%S}'.format(datetime.datetime.now())
 
                 data = {
@@ -358,6 +362,9 @@ def main(port, config_json):
                 ask_nextmove(game, 1 - color)
 
         display(game)
+    # #########################################################################################
+    # Socket-IO Events END
+    # #########################################################################################
 
     static_files = {
         '/': './index.html',
