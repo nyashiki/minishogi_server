@@ -91,12 +91,34 @@ def main(port, config_json):
 
         game.stopwatch[color] = time.time()
 
-    def quit_engine(sio, game):
+    def quit_engine(sio, game, save=True):
         if game.clients[0] is not None:
             sio.emit('disconnect', namespace='/match', room=game.clients[0].sid)
 
         if game.clients[1] is not None:
             sio.emit('disconnect', namespace='/match', room=game.clients[1].sid)
+
+        if save:
+            current_time = '{0:%Y-%m-%d-%H%M%S}'.format(datetime.datetime.now())
+            filename = '{}_{}_{}.csa'.format(current_time,
+                                            "Player1" if game.clients[0] is None else game.clients[0].name,
+                                            "Player2" if game.clients[1] is None else game.clients[1].name)
+
+            filename = (filename.replace(' ', '-')
+                                .replace(';', '')
+                                .replace(':', '')
+                                .replace('\\', '')
+                                .replace('/', '')
+                                .replace('*', '')
+                                .replace('?', '')
+                                .replace('"', '')
+                                .replace('<', '')
+                                .replace('>', '')
+                                .replace('|', '')
+                                .replace("'", ''))
+
+            with open('log/games/' + filename, 'w') as f:
+                f.write(dump_csa(game))
 
     def display(game):
         # about timelimit
