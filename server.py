@@ -27,6 +27,9 @@ class Game:
         # Stopwatch
         self.stopwatch = [None for _ in range(2)]
 
+        # Time consumption
+        self.consumption = []
+
         self.ongoing = False
         self.gameover = ''  # TORYO, SENNICHITE, TIME_UP, or ILLEGAL_MOVE
 
@@ -59,6 +62,7 @@ def dump_csa(game):
             data.append('+{}'.format(kif))
         else:
             data.append('-{}'.format(kif))
+        data.append('T{}'.format(game.consumption[ply]))
 
     data.append('%{}'.format(game.gameover))
 
@@ -141,7 +145,7 @@ def main(port, config_json):
 
             elif game.clients[1] is not None and game.clients[1].sid == sid:
                 game.clients[1].disconnect = True
-                if game.gameover = '':
+                if game.gameover == '':
                     game.gameover = 'DISCONNECT'
                 game.ongoing = False
                 quit_engine(sio, game)
@@ -292,7 +296,7 @@ def main(port, config_json):
 
         # time consumption
         current_time = time.time()
-        elapsed = math.ceil(current_time - game.stopwatch[color])
+        elapsed = max(1, math.floor(current_time - game.stopwatch[color]))
 
         if game.timelimit[color] > 0:
             m = min(game.timelimit[color], elapsed)
@@ -309,6 +313,8 @@ def main(port, config_json):
         else:
             # Apply the sent move
             game.position.do_move(move)
+
+            game.consumption.append(elapsed)
 
             # Is the game end?
             is_repetition, is_check_repetition = game.position.is_repetition()
