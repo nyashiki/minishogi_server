@@ -1,6 +1,6 @@
 # Minishogi Server
 
-This program hosts games of Minishogi (a variant of Shogi).
+This program hosts games of [Minishogi](https://en.wikipedia.org/wiki/Minishogi) (a variant of Shogi).
 
 Minishogi engines can be used with client.py via [USI protocol](http://hgm.nubati.net/usi.html).
 
