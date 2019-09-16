@@ -33,6 +33,8 @@ The config json file consits of the following:
 python3 client.py --ip <TARGET IP> --port <TARGET PORT> --config <CONFIG>
 ```
 
+*TARGET IP* and *TARGET PORT* are the ip and port of the server.
+
 ### Config file
 Default config file is client.json.
 
