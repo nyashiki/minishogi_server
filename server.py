@@ -367,10 +367,10 @@ def main(port, config_json):
     # #########################################################################################
 
     static_files = {
-        '/': './index.html',
-        '/view': './view.html',
-        '/css/': './css/',
-        '/js/': './js/'
+        '/': './html/index.html',
+        '/view': './html/view.html',
+        '/css/': './html/css/',
+        '/js/': './html/js/'
     }
 
     app = socketio.WSGIApp(sio, static_files=static_files)
