@@ -1,8 +1,12 @@
 import logging
+from optparse import OptionParser
 import os
 import simplejson as json
 import socketio
 import subprocess
+import threading
+import queue
+
 
 def send_message(engine, message, verbose=True):
     if verbose:
@@ -12,36 +16,37 @@ def send_message(engine, message, verbose=True):
     engine.stdin.write(message)
     engine.stdin.flush()
 
-def receive_message(engine, verbose=True):
-    output = b''
+def message_reader(pipe, queue):
+    with pipe:
+        for line in iter(pipe.readline, b''):
+            queue.put(line.decode('utf-8').rstrip('\r\n'))
 
-    while True:
-        read = engine.stdout.read(1)
+def receive_message(engine, queue, verbose=True):
+    while queue.empty():
+        continue
 
-        if output != b'' and (read == b'' or read == b'\n'):
-            break
-
-        output += read
-
-    output = output.decode('utf-8').strip()
+    message = queue.get()
 
     if verbose:
-        print("<:", output)
+        print('<:', message)
 
-    return output
+    return message
 
-def main(ip='localhost', port=8000):
-    with open('client.json') as f:
+def main(ip, port, config_json):
+    with open(config_json) as f:
         config = json.load(f)
 
     usi_engine = subprocess.Popen(config['command'].split(), cwd=config['cwd'], stdin=subprocess.PIPE, stdout=subprocess.PIPE)
+
+    message_queue = queue.Queue()
+    threading.Thread(target=message_reader, args=[usi_engine.stdout, message_queue]).start()
 
     send_message(usi_engine, 'usi')
 
     engine_info = { }
 
     while True:
-        output = receive_message(usi_engine).split()
+        output = receive_message(usi_engine, message_queue).split()
 
         if len(output) == 0:
             continue
@@ -59,25 +64,25 @@ def main(ip='localhost', port=8000):
 
     sio = socketio.Client()
 
-    @sio.event
+    @sio.event(namespace='/match')
     def connect(data=None):
-        sio.emit('usi', engine_info)
+        sio.emit('usi', engine_info, namespace='/match')
 
-    @sio.on('error')
+    @sio.on('error', namespace='/match')
     def error(message):
         print('ERROR: {}'.format(message))
-        exit(0)
+        os._exit(0)
 
-    @sio.on('info')
+    @sio.on('info', namespace='/match')
     def info(message):
         print('INFO: {}'.format(message))
 
-    @sio.on('isready')
+    @sio.on('isready', namespace='/match')
     def isready(data):
         send_message(usi_engine, 'isready')
 
         while True:
-            output = receive_message(usi_engine).split()
+            output = receive_message(usi_engine, message_queue).split()
 
             if len(output) == 0:
                 continue
@@ -85,11 +90,13 @@ def main(ip='localhost', port=8000):
             if output[0] == 'readyok':
                 break
 
-    @sio.on('usinewgame')
+        sio.emit('readyok', namespace='/match')
+
+    @sio.on('usinewgame', namespace='/match')
     def usinewgame(data):
         send_message(usi_engine, 'usinewgame')
 
-    @sio.on('nextmove')
+    @sio.on('nextmove', namespace='/match')
     def nextmove(data):
         sfen_position = 'position sfen ' + data['position']
         send_message(usi_engine, sfen_position)
@@ -98,15 +105,15 @@ def main(ip='localhost', port=8000):
         send_message(usi_engine, command)
 
         while True:
-            output = receive_message(usi_engine).split()
+            output = receive_message(usi_engine, message_queue).split()
 
             if len(output) == 0:
                 continue
 
             if output[0] == 'bestmove':
-                sio.emit('bestmove', output[1])
+                sio.emit('bestmove', output[1], namespace='/match')
 
-    @sio.event
+    @sio.event(namespace='/match')
     def disconnect(data=None):
         send_message(usi_engine, 'quit')
         usi_engine.wait()
@@ -117,4 +124,11 @@ def main(ip='localhost', port=8000):
     sio.wait()
 
 if __name__ == '__main__':
-    main()
+    parser = OptionParser()
+    parser.add_option('-c', '--config', dest='config_json', help='confile json file', default='./client.json')
+    parser.add_option('-i', '--ip', dest='ip', help='target ip', default='localhost')
+    parser.add_option('-p', '--port', dest='port', help='target port', type='int', default=8000)
+
+    (options, args) = parser.parse_args()
+
+    main(ip=options.ip, port=options.port, config_json=options.config_json)
