@@ -16,20 +16,20 @@ def send_message(engine, message, verbose=True):
     engine.stdin.write(message)
     engine.stdin.flush()
 
-def message_reader(pipe, queue):
+def message_reader(pipe, queue, verbose=True):
     with pipe:
         for line in iter(pipe.readline, b''):
-            queue.put(line.decode('utf-8').rstrip('\r\n'))
+            message = line.decode('utf-8').rstrip('\r\n')
+            queue.put(message)
 
-def receive_message(engine, queue, verbose=True):
+            if verbose:
+                print('<:', message)
+
+def receive_message(engine, queue):
     while queue.empty():
         continue
 
     message = queue.get()
-
-    if verbose:
-        print('<:', message)
-
     return message
 
 def main(ip, port, config_json):
@@ -98,11 +98,29 @@ def main(ip, port, config_json):
 
     @sio.on('nextmove', namespace='/match')
     def nextmove(data):
-        sfen_position = 'position sfen ' + data['position']
-        send_message(usi_engine, sfen_position)
+        if nextmove.ponder is not None:
+            if nextmove.ponder == data['position'].split()[-1]:
+                send_message(usi_engine, 'ponderhit')
+            else:
+                send_message(usi_engine, 'stop')
+                nextmove.ponder = None
 
-        command = 'go btime {} wtime {} byoyomi {}'.format(data['btime'], data['wtime'], data['byoyomi'])
-        send_message(usi_engine, command)
+                # wait until 'bestmove' command is sent
+                while True:
+                    output = receive_message(usi_engine, message_queue).split()
+
+                    if len(output) == 0:
+                        continue
+
+                    if output[0] == 'bestmove':
+                        break
+
+        sfen_position = 'position sfen ' + data['position']
+        if nextmove.ponder is None:
+            send_message(usi_engine, sfen_position)
+
+            command = 'go btime {} wtime {} byoyomi {}'.format(data['btime'], data['wtime'], data['byoyomi'])
+            send_message(usi_engine, command)
 
         while True:
             output = receive_message(usi_engine, message_queue).split()
@@ -112,6 +130,19 @@ def main(ip, port, config_json):
 
             if output[0] == 'bestmove':
                 sio.emit('bestmove', output[1], namespace='/match')
+
+                if len(output) >= 4 and output[2] == 'ponder':
+                    nextmove.ponder = output[3]
+                    ponder_position = '{} {} {}'.format(sfen_position, output[1], nextmove.ponder)
+
+                    send_message(usi_engine, ponder_position)
+                    send_message(usi_engine, 'go ponder')
+                else:
+                    nextmove.ponder = None
+
+                break
+
+    nextmove.ponder = None
 
     @sio.event(namespace='/match')
     def disconnect(data=None):
