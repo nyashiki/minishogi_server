@@ -17,17 +17,17 @@ class Game:
         self.position = minishogilib.Position()
         self.position.set_start_position()
 
-        # Time limit
+        # Time limit.
         self.timelimit = [0 for _ in range(2)]
         self.byoyomi = 0
 
-        # Clients
+        # Clients.
         self.clients = [None for _ in range(2)]
 
-        # Stopwatch
+        # Stopwatch.
         self.stopwatch = [None for _ in range(2)]
 
-        # Time consumption
+        # Time consumption.
         self.consumption = []
 
         self.ongoing = False
@@ -43,6 +43,14 @@ class Client:
         self.disconnect = False
 
 def dump_csa(game):
+    """Dump kif in CSA representation.
+
+    # Arguments:
+        game: Game class.
+
+    # Returns:
+        The string of CSA representation kif of the game.
+    """
     data = []
 
     data.append('V2.2')
@@ -78,8 +86,15 @@ def main(port, config_json):
     sio = socketio.Server()
 
     def ask_nextmove(game, color):
+        """Ask the client a next move.
+
+        # Arguments
+            game: Game class.
+            color: the side to move (0=First player, 1=Second player).
+        """
         sid = game.clients[color].sid
 
+        # Set data that is sent to the client.
         data = {
             'position': game.position.sfen(True),
             'btime': game.timelimit[0] * 1000,
@@ -87,14 +102,26 @@ def main(port, config_json):
             'byoyomi': game.byoyomi * 1000
         }
 
+        # Ask the client a next move.
         sio.emit('nextmove', data, namespace='/match', room=sid)
 
+        # Begin to measure consumed time.
         game.stopwatch[color] = time.time()
 
     def quit_engine(sio, game, save=True):
+        """Quit the client.
+
+        # Arguments
+            sio: socketio.Server()
+            game: Game class.
+            save: If true, save the CSA kif of the game.
+        """
+
+        # Send `disconnect` message to the first player client.
         if game.clients[0] is not None:
             sio.emit('disconnect', namespace='/match', room=game.clients[0].sid)
 
+        # Send `disconnect` message to the second player client.
         if game.clients[1] is not None:
             sio.emit('disconnect', namespace='/match', room=game.clients[1].sid)
 
@@ -122,7 +149,9 @@ def main(port, config_json):
                 f.write(dump_csa(game))
 
     def display(game):
-        # about timelimit
+        """Send the current position of the game to viewer clients.
+        """
+
         color = game.position.get_side_to_move()
 
         timelimit = {
@@ -144,12 +173,16 @@ def main(port, config_json):
     # #########################################################################################
     # Socket-IO Events BEGIN
     # #########################################################################################
+
     @sio.event
     def connect(sid, data=None):
+        """A clients connects to this server.
+        """
         if 'HTTP_REFERER' in data:
             split = data['HTTP_REFERER'].split('?')
 
             if len(split) > 1:
+                # If id is specified, it supposed that a clients want to view the game.
                 id = split[1]
 
                 for game in games:
@@ -161,6 +194,8 @@ def main(port, config_json):
 
     @sio.event
     def disconnect(sid, data=None):
+        """A clients disconnects from this server.
+        """
         for game in games:
             if game.clients[0] is not None and game.clients[0].sid == sid:
                 game.clients[0].disconnect = True
@@ -177,11 +212,13 @@ def main(port, config_json):
                 quit_engine(sio, game)
 
             else:
-                # Someone leave the room of a game
+                # Someone leaves the room of a game.
                 game.viewers = list(filter(lambda x: x != sid, game.viewers))
 
     @sio.on('download')
     def download(sid, id):
+        """A viewer wants to download CSA kif.
+        """
         for game in games:
             if id == str(game.id):
                 current_time = '{0:%Y-%m-%d-%H%M%S}'.format(datetime.datetime.now())
@@ -197,6 +234,8 @@ def main(port, config_json):
 
     @sio.on('matching')
     def matching(sid):
+        """Returns matching data.
+        """
         data = []
 
         for game in reversed(games):
@@ -213,12 +252,18 @@ def main(port, config_json):
 
     @sio.on('usi', namespace='/match')
     def usi(sid, data):
+        """`usi` command is sent from a client.
+
+        If a client sends `usi` command, it supposed that the client wants to have a match.
+        """
+        # If there is a one-player reserved game, set the client as the second player.
         target_game = None
         for game in games:
             if game.gameover == '' and game.clients[1] is None:
                 target_game = game
                 break
 
+        # If there is no one-player reserved game, set the client as the first player.
         if target_game is None:
             game = Game()
             game.timelimit[0] = config['btime'] // 1000
@@ -232,16 +277,19 @@ def main(port, config_json):
 
         sid_game[sid] = game
 
+        # For some reason an on-going game is selected as the target game, but this is an error.
         if game.clients[1] is not None:
             sio.emit('error', 'The game has already started.',
                      namespace='/match', room=sid)
             return
 
+        # A client sends `usi` commands, but the name field is None.
         if not 'name' in data:
             sio.emit('error', 'You sent a request but name field was None.',
                      namespace='/match', room=sid)
             return
 
+        # A client sends `usi` commands, but the author field is None.
         if not 'author' in data:
             sio.emit('error', 'You sent a request but author field was None.',
                      namespace='/match', room=sid)
@@ -260,16 +308,18 @@ def main(port, config_json):
 
         if game.clients[0] is not None and game.clients[1] is not None:
             # Two players sit down, so a game is starting.
-            # Initialization
+            # Initialization.
             game.position = minishogilib.Position()
             game.position.set_start_position()
 
-            # Call isready and usinewgame
+            # Call isready and usinewgame.
             sio.emit('isready', namespace='/match', room=game.clients[0].sid)
             sio.emit('isready', namespace='/match', room=game.clients[1].sid)
 
     @sio.on('readyok', namespace='/match')
     def readyok(sid, data=None):
+        """`readyok` message is sent from a client.
+        """
         game = sid_game[sid]
 
         for client in game.clients:
@@ -277,12 +327,13 @@ def main(port, config_json):
                 client.readyok = True
 
         if game.clients[0].readyok and game.clients[1].readyok:
+            # Send `usinewgame` message to the clients.
             sio.emit('usinewgame', namespace='/match',
                      room=game.clients[0].sid)
             sio.emit('usinewgame', namespace='/match',
                      room=game.clients[1].sid)
 
-            # Ask a first move
+            # Ask a first move.
             game.ongoing = True
             ask_nextmove(game, 0)
 
@@ -290,16 +341,19 @@ def main(port, config_json):
 
     @sio.on('bestmove', namespace='/match')
     def bestmove(sid, data):
+        """`bestmove` message is sent from a client.
+        """
         game = sid_game[sid]
 
         color = game.position.get_side_to_move()
 
-        # An unknown player sent 'bestmove' command, so discard it
+        # An unknown player sent 'bestmove' command, so discard it.
         if game.clients[color].sid != sid:
             return
 
         sfen_move = data
 
+        # If the client resigns.
         if sfen_move == 'resign':
             print('RESIGN')
             quit_engine(sio, game)
@@ -308,7 +362,7 @@ def main(port, config_json):
             display(game)
             return
 
-        # check whether the sent move is legal
+        # Check whether the sent move is legal.
         legal_moves = game.position.generate_moves()
         if not sfen_move in [m.sfen() for m in legal_moves]:
             print('ILLEGAL MOVE')
@@ -320,7 +374,7 @@ def main(port, config_json):
 
         move = game.position.sfen_to_move(sfen_move)
 
-        # time consumption
+        # Time consumption.
         current_time = time.time()
         elapsed = max(1, math.floor(current_time - game.stopwatch[color]))
 
@@ -329,15 +383,15 @@ def main(port, config_json):
             game.timelimit[color] -= m
             elapsed -= m
 
-        # lose by timelimit
         if elapsed > game.byoyomi:
+            # Lose by timelimit.
             print('TIMEOUT')
             quit_engine(sio, game)
             game.ongoing = False
             game.gameover = 'TIME_UP'
 
         else:
-            # Apply the sent move
+            # Apply the sent move.
             game.position.do_move(move)
 
             game.consumption.append(elapsed)
@@ -358,10 +412,11 @@ def main(port, config_json):
                 game.gameover = 'SENNICHITE'
 
             else:
-                # Ask the other player to send a next move
+                # Ask the other player to send a next move.
                 ask_nextmove(game, 1 - color)
 
         display(game)
+
     # #########################################################################################
     # Socket-IO Events END
     # #########################################################################################
