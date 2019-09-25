@@ -1,23 +1,25 @@
 <html>
-    <head>
-        <meta charset="utf-8">
 
-        <title>
-            Watching
-        </title>
+<head>
+    <meta charset="utf-8">
 
-        <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/2.2.0/socket.io.js"></script>
-        <script src="./js/matching.js"></script>
-    </head>
+    <title>
+        Minishogi Server
+    </title>
 
-    <body onLoad="get_matching()">
-        Pending
-        <ul id="pending"></ul>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/2.2.0/socket.io.js"></script>
+    <script src="./js/matching.js"></script>
+</head>
 
-        対局中
-        <ul id="ongoing"></ul>
+<body onLoad="get_matching()">
+    Pending
+    <ul id="pending"></ul>
 
-        対局終了
-        <ul id="finished"></ul>
-    </body>
+    対局中
+    <ul id="ongoing"></ul>
+
+    対局終了
+    <ul id="finished"></ul>
+</body>
+
 </html>
