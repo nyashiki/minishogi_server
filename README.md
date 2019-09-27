@@ -4,6 +4,19 @@ This program hosts games of [Minishogi](https://en.wikipedia.org/wiki/Minishogi)
 
 Minishogi engines can be used with client.py via [USI protocol](http://hgm.nubati.net/usi.html).
 
+# Preparation
+
+## install minishogilib
+
+This program is based on [minishogilib](https://github.com/Nyashiki/minishogilib),
+so you have to install minishogilib beforehand.
+
+## install requirements
+
+```
+pip3 install -r requirements.txt
+```
+
 # Usage
 
 ## Server
