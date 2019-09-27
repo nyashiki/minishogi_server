@@ -377,6 +377,7 @@ def main(port, config_json):
         # Time consumption.
         current_time = time.time()
         elapsed = max(1, math.floor(current_time - game.stopwatch[color]))
+        game.consumption.append(elapsed)
 
         if game.timelimit[color] > 0:
             m = min(game.timelimit[color], elapsed)
@@ -393,8 +394,6 @@ def main(port, config_json):
         else:
             # Apply the sent move.
             game.position.do_move(move)
-
-            game.consumption.append(elapsed)
 
             # Is the game end?
             is_repetition, is_check_repetition = game.position.is_repetition()
