@@ -189,7 +189,11 @@ def main(ip, port, config_json):
                 if len(output) >= 4 and output[2] == 'ponder':
                     # If ponder is sent, set ponder move and send `go ponder` command to the USI engine.
                     nextmove.ponder = output[3]
-                    ponder_position = '{} {} {}'.format(sfen_position, output[1], nextmove.ponder)
+                    if sfen_position[-1] == '1' :
+                        # If the position is the initial position, `moves` should be added.
+                        ponder_position = '{} moves {} {}'.format(sfen_position, output[1], nextmove.ponder)
+                    else:
+                        ponder_position = '{} {} {}'.format(sfen_position, output[1], nextmove.ponder)
 
                     send_message(usi_engine, ponder_position)
                     send_message(usi_engine, 'go ponder')
