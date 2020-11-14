@@ -112,7 +112,7 @@ def main(ip, port, config_json):
         print('INFO: {}'.format(message))
 
     @sio.on('isready', namespace='/match')
-    def isready(data):
+    def isready(data=None):
         """`isready` message was sent from the server.
 
         If a client gets this message, the client has to send `isready` command to the USI engine,
@@ -133,7 +133,7 @@ def main(ip, port, config_json):
         sio.emit('readyok', namespace='/match')
 
     @sio.on('usinewgame', namespace='/match')
-    def usinewgame(data):
+    def usinewgame(data=None):
         """`usinewgame` message was sent from the server.
 
         If a client gets this message, the client has to send `usinewgame` command to the USI engine.

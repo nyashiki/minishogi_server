@@ -396,7 +396,7 @@ def main(port, config_json):
             game.position.do_move(move)
 
             # Is the game end?
-            is_repetition, is_check_repetition = game.position.is_repetition()
+            is_repetition, is_check_repetition, _ = game.position.is_repetition()
             legal_moves = game.position.generate_moves()
             if is_check_repetition:
                 print('CHECK REPETITION')
