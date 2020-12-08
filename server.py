@@ -22,7 +22,8 @@ class Game:
         self.byoyomi = 0
 
         # Clients.
-        self.clients = [None for _ in range(2)]
+        # self.clients = [None for _ in range(2)]
+        self.clients_sid = [None for _ in range(2)]
 
         # Stopwatch.
         self.stopwatch = [None for _ in range(2)]
@@ -37,12 +38,13 @@ class Game:
 
 class Client:
     def __init__(self):
-        self.sid = None
+        # self.sid = None
         self.name = ""
+        self.pending = False
         self.readyok = False
-        self.disconnect = False
+        # self.disconnect = False
 
-def dump_csa(game):
+def dump_csa(game, clients):
     """Dump kif in CSA representation.
 
     # Arguments:
@@ -54,8 +56,8 @@ def dump_csa(game):
     data = []
 
     data.append('V2.2')
-    data.append('N+{}'.format("" if game.clients[0] is None else game.clients[0].name))
-    data.append('N-{}'.format("" if game.clients[1] is None else game.clients[1].name))
+    data.append('N+{}'.format("" if clients[0] is None else clients[0].name))
+    data.append('N-{}'.format("" if clients[1] is None else clients[1].name))
     data.append('P1-HI-KA-GI-KI-OU')
     data.append('P2 *  *  *  * -FU')
     data.append('P3 *  *  *  *  * ')
@@ -81,9 +83,12 @@ def main(port, config_json):
         config = json.load(f)
 
     games = []  # Hosting games
-    sid_game = { }  # Which game is this sid's player playing?
-
+    sid_game = {} # Which game is this sid's player playing?
+    sid_client = {} # key = sid, value = Client
     sio = socketio.Server()
+
+    def get_clients(clients_sid):
+        return [sid_client.get(clients_sid[0]), sid_client.get(clients_sid[1])]
 
     def ask_nextmove(game, color):
         """Ask the client a next move.
@@ -92,7 +97,7 @@ def main(port, config_json):
             game: Game class.
             color: the side to move (0=First player, 1=Second player).
         """
-        sid = game.clients[color].sid
+        sid = game.clients_sid[color]
 
         # Set data that is sent to the client.
         data = {
@@ -117,19 +122,23 @@ def main(port, config_json):
             save: If true, save the CSA kif of the game.
         """
 
+        clients = get_clients(game.clients_sid)
+
         # Send `disconnect` message to the first player client.
-        if game.clients[0] is not None:
-            sio.emit('disconnect', namespace='/match', room=game.clients[0].sid)
+        if clients[0] is not None:
+            sio.emit('disconnect', namespace='/match', room=game.clients_sid[0])
 
         # Send `disconnect` message to the second player client.
-        if game.clients[1] is not None:
-            sio.emit('disconnect', namespace='/match', room=game.clients[1].sid)
+        if clients[1] is not None:
+            sio.emit('disconnect', namespace='/match', room=game.clients_sid[1])
 
         if save:
             current_time = '{0:%Y-%m-%d-%H%M%S}'.format(datetime.datetime.now())
-            filename = '{}_{}_{}.csa'.format(current_time,
-                                            "Player1" if game.clients[0] is None else game.clients[0].name,
-                                            "Player2" if game.clients[1] is None else game.clients[1].name)
+            filename = '{}_{}_{}.csa'.format(
+                current_time,
+                "Player1" if clients[0] is None else clients[0].name,
+                "Player2" if clients[1] is None else clients[1].name
+            )
 
             # Replace not allowed characters for filename
             filename = (filename.replace(' ', '-')
@@ -146,7 +155,10 @@ def main(port, config_json):
                                 .replace("'", ''))
 
             with open('log/games/' + filename, 'w') as f:
-                f.write(dump_csa(game))
+                f.write(dump_csa(game, clients))
+
+        # Remove client
+        # ...
 
     def display(game):
         """Send the current position of the game to viewer clients.
@@ -196,24 +208,18 @@ def main(port, config_json):
     def disconnect(sid, data=None):
         """A clients disconnects from this server.
         """
-        for game in games:
-            if game.clients[0] is not None and game.clients[0].sid == sid:
-                game.clients[0].disconnect = True
-                if game.gameover == '':
-                    game.gameover = 'DISCONNECT'
-                game.ongoing = False
-                quit_engine(sio, game)
+        
+        game = sid_game[sid]
+        clients = get_clients(game.clients_sid)
+        if (clients[0] is not None and game.clients_sid[0] == sid) or (clients[1] is not None and game.clients_sid[1] == sid):
+            if game.gameover == '':
+                game.gameover = 'DISCONNECT'
+            game.ongoing = False
+            quit_engine(sio, game)
 
-            elif game.clients[1] is not None and game.clients[1].sid == sid:
-                game.clients[1].disconnect = True
-                if game.gameover == '':
-                    game.gameover = 'DISCONNECT'
-                game.ongoing = False
-                quit_engine(sio, game)
-
-            else:
-                # Someone leaves the room of a game.
-                game.viewers = list(filter(lambda x: x != sid, game.viewers))
+        else:
+            # Someone leaves the room of a game.
+            game.viewers = list(filter(lambda x: x != sid, game.viewers))        
 
     @sio.on('download')
     def download(sid, id):
@@ -222,40 +228,97 @@ def main(port, config_json):
         for game in games:
             if id == str(game.id):
                 current_time = '{0:%Y-%m-%d-%H%M%S}'.format(datetime.datetime.now())
+                clients = get_clients(game.clients_sid)
 
                 data = {
-                    'kif': dump_csa(game),
-                    'filename': '{}_{}_{}.csa'.format(current_time,
-                                                    "Player1" if game.clients[0] is None else game.clients[0].name,
-                                                    "Player2" if game.clients[1] is None else game.clients[1].name)
+                    'kif': dump_csa(game, clients),
+                    'filename': '{}_{}_{}.csa'.format(
+                        current_time, 
+                        "Player1" if clients[0] is None else clients[0].name,
+                        "Player2" if clients[1] is None else clients[1].name
+                    )
                 }
 
                 return data, 200
 
     @sio.on('matching')
-    def matching(sid):
-        """Returns matching data.
-        """
-        data = []
+    def matching(sid, clients_sid):
+        if not clients_sid[0] in sid_client or not clients_sid[1] in sid_client:
+            return
 
-        for game in reversed(games):
-            game_data = {
-                'gameover': game.gameover,
-                'ongoing': game.ongoing,
+        clients = get_clients(clients_sid)
+        if not clients[0].pending or not clients[1].pending:
+            sio.emit('error', 'The game has already started.', namespace='/match', room=sid)
+            return
+
+        clients[0].pending = clients[1].pending = False
+        game = Game()
+        game.clients_sid = clients_sid
+        game.timelimit[0] = config['wtime'] // 1000
+        game.timelimit[1] = config['btime'] // 1000
+        game.byoyomi = config['byoyomi'] // 1000
+        game.id = uuid.uuid4()
+        game.ongoing = True
+        games.append(game)
+        sid_game[clients_sid[0]] = game
+        sid_game[clients_sid[1]] = game
+        
+        sio.emit('isready', namespace='/match', room=clients_sid[0])
+        sio.emit('isready', namespace='/match', room=clients_sid[1])
+
+    @sio.on('update')
+    def update_info(sid):
+        game_data = []
+        print(len(games))
+        for game in games:
+            clients = get_clients(game.clients_sid)
+            data = {
+                'gameover' : game.gameover,
+                'ongoing' : game.ongoing,
                 'link': './view?{}'.format(game.id),
-                'player1': "Player1" if game.clients[0] is None else game.clients[0].name,
-                "player2": "Player2" if game.clients[1] is None else game.clients[1].name
+                'player1': 'Player1' if clients[0] is None else clients[0].name,
+                'player2': 'Player2' if clients[1] is None else clients[1].name
             }
+            game_data.append(data)
+        
+        client_data = [] 
+        for id, client in sid_client.items():
+            if client.pending:
+                data = {
+                    'id' : id,
+                    'name' : client.name,
+                }
+                client_data.append(data)
 
-            data.append(game_data)
-        return data
+        return game_data, client_data
 
+
+    @sio.on('login', namespace='/match')
+    def login(sid, data):
+        # A client sends `usi` commands, but the name field is None.
+        if not 'name' in data:
+            sio.emit('error', 'You sent a request but name field was None.', namespace='/match', room=sid)
+            return
+
+        # A client sends `usi` commands, but the author field is None.
+        if not 'author' in data:
+            sio.emit('error', 'You sent a request but author field was None.', namespace='/match', room=sid)
+            return
+
+        client = Client()
+        client.name = data['name']
+        client.pending = True
+        sid_client[sid] = client
+
+        sio.emit('info', 'Correctly accepted.', namespace='/match', room=sid)
+
+    """
     @sio.on('usi', namespace='/match')
     def usi(sid, data):
-        """`usi` command is sent from a client.
-
-        If a client sends `usi` command, it supposed that the client wants to have a match.
-        """
+        # `usi` command is sent from a client.
+        # 
+        # If a client sends `usi` command, it supposed that the client wants to have a match.
+        
         # If there is a one-player reserved game, set the client as the second player.
         target_game = None
         for game in games:
@@ -279,25 +342,22 @@ def main(port, config_json):
 
         # For some reason an on-going game is selected as the target game, but this is an error.
         if game.clients[1] is not None:
-            sio.emit('error', 'The game has already started.',
-                     namespace='/match', room=sid)
+            sio.emit('error', 'The game has already started.', namespace='/match', room=sid)
             return
 
         # A client sends `usi` commands, but the name field is None.
         if not 'name' in data:
-            sio.emit('error', 'You sent a request but name field was None.',
-                     namespace='/match', room=sid)
+            sio.emit('error', 'You sent a request but name field was None.', namespace='/match', room=sid)
             return
 
         # A client sends `usi` commands, but the author field is None.
         if not 'author' in data:
-            sio.emit('error', 'You sent a request but author field was None.',
-                     namespace='/match', room=sid)
+            sio.emit('error', 'You sent a request but author field was None.', namespace='/match', room=sid)
             return
 
         client = Client()
-        client.sid = sid
         client.name = data['name']
+        sid_client[sid] = client
 
         if game.clients[0] is None:
             game.clients[0] = client
@@ -313,8 +373,9 @@ def main(port, config_json):
             game.position.set_start_position()
 
             # Call isready and usinewgame.
-            sio.emit('isready', namespace='/match', room=game.clients[0].sid)
-            sio.emit('isready', namespace='/match', room=game.clients[1].sid)
+            sio.emit('isready', namespace='/match', room=game.clients_sid[0])
+            sio.emit('isready', namespace='/match', room=game.clients_sid[1])
+    """
 
     @sio.on('readyok', namespace='/match')
     def readyok(sid, data=None):
@@ -322,16 +383,13 @@ def main(port, config_json):
         """
         game = sid_game[sid]
 
-        for client in game.clients:
-            if client.sid == sid:
-                client.readyok = True
+        sid_client[sid].readyok = True
+        clients = get_clients(game.clients_sid)
 
-        if game.clients[0].readyok and game.clients[1].readyok:
+        if clients[0].readyok and clients[1].readyok:
             # Send `usinewgame` message to the clients.
-            sio.emit('usinewgame', namespace='/match',
-                     room=game.clients[0].sid)
-            sio.emit('usinewgame', namespace='/match',
-                     room=game.clients[1].sid)
+            sio.emit('usinewgame', namespace='/match', room=game.clients_sid[0])
+            sio.emit('usinewgame', namespace='/match', room=game.clients_sid[1])
 
             # Ask a first move.
             game.ongoing = True
@@ -348,7 +406,7 @@ def main(port, config_json):
         color = game.position.get_side_to_move()
 
         # An unknown player sent 'bestmove' command, so discard it.
-        if game.clients[color].sid != sid:
+        if game.clients_sid[color] != sid:
             return
 
         sfen_move = data
@@ -432,10 +490,8 @@ def main(port, config_json):
 
 if __name__ == '__main__':
     parser = OptionParser()
-    parser.add_option('-c', '--config', dest='config_json',
-                      help='confile json file', default='./server.json')
-    parser.add_option('-p', '--port', dest='port',
-                      help='target port', type='int', default=8000)
+    parser.add_option('-c', '--config', dest='config_json', help='confile json file', default='./server.json')
+    parser.add_option('-p', '--port', dest='port', help='target port', type='int', default=8000)
 
     (options, args) = parser.parse_args()
 

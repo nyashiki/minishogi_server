@@ -96,7 +96,8 @@ def main(ip, port, config_json):
     def connect(data=None):
         """Connect to the matching server.
         """
-        sio.emit('usi', engine_info, namespace='/match')
+        sio.emit('login', engine_info, namespace='/match')
+        #sio.emit('usi', engine_info, namespace='/match')
 
     @sio.on('error', namespace='/match')
     def error(message):

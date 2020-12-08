@@ -1,28 +1,41 @@
-var get_matching = function() {
-    var url = window.location.protocol + "//" + window.location.host + "/";
-    var socket = io(url);
+var url = window.location.protocol + '//' + window.location.host + '/';
+var socket = io(url);
+var names = ['FirstProgramSelect','SecondProgramSelect']
 
-    socket.emit("matching", function (data) {
-        var pending = document.getElementById("pending");
-        var ongoing = document.getElementById("ongoing");
-        var finished = document.getElementById("finished");
-
-        data.forEach(function(element) {
+var update = function() {
+    socket.emit('update', function(game_data, client_data) {
+        game_data.forEach(function(game) {
             var target = null;
-
-            if (element["ongoing"] == true) {
-                target = document.getElementById("ongoing");
-            } else {
-                if (element["gameover"] == "") {
-                    target = document.getElementById("pending");
-                } else {
-                    target = document.getElementById("finished");
-                }
-            }
-
-            var list = document.createElement("li");
-            list.innerHTML = "<a href=" + element["link"] + ">" + element["player1"] + " - " + element["player2"] + "</a>";
+            if (game['ongoing'] == true)
+                target = document.getElementById('ongoing')
+            else if(game['gameover'] != "")
+                target = document.getElementById('finished')
+            else
+                target = document.getElementById('exception')
+            var list = document.createElement('li');
+            list.innerHTML = '<a href=' + game['link'] + '>' + game['player1'] + ' - ' + game['player2'] + '</a>';
             target.appendChild(list);
         });
+        client_data.forEach(function(client){
+            names.forEach(function(name) {
+                var select = document.getElementById(name);
+                var option = document.createElement('option');
+                option.value = client['id'];
+                option.text = client['name'];
+                select.appendChild(option);
+            });
+        });
     });
+};
+
+var matching = function() {
+    id = [];
+    names.forEach(function(name) {
+        var select = document.getElementById(name);
+        id.push(select.value);
+    });
+    if (id[0] != id[1]) {
+        socket.emit('matching', id);
+        // update();
+    }
 };
