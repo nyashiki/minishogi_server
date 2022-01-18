@@ -8,6 +8,7 @@ import simplejson as json
 import socketio
 import time
 import uuid
+import random
 
 
 class Game:
@@ -43,7 +44,7 @@ class Client:
         self.readyok = False
         self.disconnect = False
 
-def dump_csa(game):
+def dump_json(game):
     """Dump kif in CSA representation.
 
     # Arguments:
@@ -52,30 +53,14 @@ def dump_csa(game):
     # Returns:
         The string of CSA representation kif of the game.
     """
-    data = []
+    data = { }
 
-    data.append('V2.2')
-    data.append('N+{}'.format("" if game.clients[0] is None else game.clients[0].name))
-    data.append('N-{}'.format("" if game.clients[1] is None else game.clients[1].name))
-    data.append('P1-HI-KA-GI-KI-OU')
-    data.append('P2 *  *  *  * -FU')
-    data.append('P3 *  *  *  *  * ')
-    data.append('P4+FU *  *  *  * ')
-    data.append('P5+OU+KI+GI+KA+HI')
-    data.append('+')
+    data['player1'] = '(none)' if game.clients[0] is None else game.clients[0].name
+    data['player2'] = '(none)' if game.clients[1] is None else game.clients[1].name
+    data['kif'] = game.position.sfen(history=True)
+    data['gameover'] = 'on going' if game.gameover == '' else game.gameover
 
-    csa_kif = game.position.get_csa_kif()
-
-    for (ply, kif) in enumerate(csa_kif):
-        if ply % 2 == 0:
-            data.append('+{}'.format(kif))
-        else:
-            data.append('-{}'.format(kif))
-        data.append('T{}'.format(game.consumption[ply]))
-
-    data.append('%{}'.format(game.gameover))
-
-    return '\n'.join(data)
+    return json.dumps(data, indent=4)
 
 def main(port, config_json):
     with open(config_json) as f:
@@ -149,7 +134,7 @@ def main(port, config_json):
                                 .replace("'", ''))
 
             with open('log/games/' + filename, 'w') as f:
-                f.write(dump_csa(game))
+                f.write(dump_json(game))
 
     def display(game):
         """Send the current position of the game to viewer clients.
@@ -229,8 +214,8 @@ def main(port, config_json):
                 current_time = '{0:%Y-%m-%d-%H%M%S}'.format(datetime.datetime.now())
 
                 data = {
-                    'kif': dump_csa(game),
-                    'filename': '{}_{}_{}.csa'.format(current_time,
+                    'kif': dump_json(game),
+                    'filename': '{}_{}_{}.json'.format(current_time,
                                                     "Player1" if game.clients[0] is None else game.clients[0].name,
                                                     "Player2" if game.clients[1] is None else game.clients[1].name)
                 }
@@ -317,7 +302,12 @@ def main(port, config_json):
             # Two players sit down, so a game is starting.
             # Initialization.
             game.position = minishogilib.Position()
-            game.position.set_start_position()
+
+            if 'initial_positions' in config:
+                initial_position = random.choice(config['initial_positions'])
+                game.position.set_sfen(initial_position)
+            else:
+                game.position.set_start_position()
 
             # Call isready and usinewgame.
             sio.emit('isready', namespace='/match', room=game.clients[0].sid)

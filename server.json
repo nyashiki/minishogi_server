@@ -3,5 +3,8 @@
     "wtime": 10000,
     "byoyomi": 0,
     "binc": 10000,
-    "winc": 10000
+    "winc": 10000,
+    "initial_positions": [
+        "rbsgk/4p/5/P4/KGSBR b - 1"
+    ]
 }
