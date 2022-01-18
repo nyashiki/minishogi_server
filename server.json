@@ -1,5 +1,7 @@
 {
-    "btime": 1200000,
-    "wtime": 1200000,
-    "byoyomi": 0
+    "btime": 10000,
+    "wtime": 10000,
+    "byoyomi": 0,
+    "binc": 10000,
+    "winc": 10000
 }

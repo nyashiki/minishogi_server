@@ -6,6 +6,8 @@ import socketio
 import subprocess
 import threading
 import queue
+import time
+import minishogilib
 
 
 def send_message(engine, message, verbose=True):
@@ -57,6 +59,8 @@ def receive_message(queue):
 def main(ip, port, config_json):
     with open(config_json) as f:
         config = json.load(f)
+
+    state = minishogilib.Position()
 
     # Run an USI engine.
     usi_engine = subprocess.Popen(config['command'].split(), cwd=config['cwd'], stdin=subprocess.PIPE, stdout=subprocess.PIPE)
@@ -146,6 +150,8 @@ def main(ip, port, config_json):
 
         If a client gets this message, the client has to ask the engine a next move.
         """
+        think_start_time = time.time()
+
         if nextmove.ponder is not None:
             # If ponder is set, judge whether the ponder move is the same as the actual move.
             if nextmove.ponder == data['position'].split()[-1]:
@@ -157,6 +163,7 @@ def main(ip, port, config_json):
                 nextmove.ponder = None
 
                 # Wait until `bestmove` command is sent.
+                # Note: this `bestmove` command is dummy, because the predicted ponder move is different from the actual given move.
                 while True:
                     output = receive_message(message_queue).split()
 
@@ -173,7 +180,12 @@ def main(ip, port, config_json):
             # Ask the USI engine a next move.
             send_message(usi_engine, sfen_position)
 
-            command = 'go btime {} wtime {} byoyomi {}'.format(data['btime'], data['wtime'], data['byoyomi'])
+            if data['byoyomi'] > 0:
+                command = 'go btime {} wtime {} byoyomi {}'.format(data['btime'], data['wtime'], data['byoyomi'])
+            else:
+                command = 'go btime {} wtime {} binc {} winc {}'.format(data['btime'], data['wtime'], data['binc'], data['winc'])
+
+            prev_think_time = time.time()
             send_message(usi_engine, command)
 
         # Wait until `bestmove` command is sent.
@@ -186,6 +198,14 @@ def main(ip, port, config_json):
             if output[0] == 'bestmove':
                 sio.emit('bestmove', output[1], namespace='/match')
 
+                # Calculate the remaining time while pondering.
+                think_elapsed = time.time() - think_start_time
+                state.set_sfen(data['position'])
+                if state.get_side_to_move() == 0:
+                    data['btime'] -= int(think_elapsed * 1000)
+                else:
+                    data['wtime'] -= int(think_elapsed * 1000)
+
                 if len(output) >= 4 and output[2] == 'ponder':
                     # If ponder is sent, set ponder move and send `go ponder` command to the USI engine.
                     nextmove.ponder = output[3]
@@ -196,7 +216,10 @@ def main(ip, port, config_json):
                         ponder_position = '{} {} {}'.format(sfen_position, output[1], nextmove.ponder)
 
                     send_message(usi_engine, ponder_position)
-                    send_message(usi_engine, 'go ponder')
+                    if data['byoyomi'] > 0:
+                        send_message(usi_engine, 'go ponder btime {} wtime {} byoyomi {}'.format(data['btime'], data['wtime'], data['byoyomi']))
+                    else:
+                        send_message(usi_engine, 'go ponder btime {} wtime {} binc {} winc {}'.format(data['btime'], data['wtime'], data['binc'], data['winc']))
                 else:
                     nextmove.ponder = None
 

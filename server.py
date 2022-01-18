@@ -20,6 +20,7 @@ class Game:
         # Time limit.
         self.timelimit = [0 for _ in range(2)]
         self.byoyomi = 0
+        self.inc = [0 for _ in range(2)]
 
         # Clients.
         self.clients = [None for _ in range(2)]
@@ -99,7 +100,9 @@ def main(port, config_json):
             'position': game.position.sfen(True),
             'btime': game.timelimit[0] * 1000,
             'wtime': game.timelimit[1] * 1000,
-            'byoyomi': game.byoyomi * 1000
+            'byoyomi': game.byoyomi * 1000,
+            'binc': game.inc[0] * 1000,
+            'winc': game.inc[1] * 1000
         }
 
         # Ask the client a next move.
@@ -157,7 +160,9 @@ def main(port, config_json):
         timelimit = {
             'btime': game.timelimit[0],
             'wtime': game.timelimit[1],
-            'byoyomi': game.byoyomi
+            'byoyomi': game.byoyomi,
+            'binc': game.inc[0],
+            'winc': game.inc[1]
         }
 
         for viewer in game.viewers:
@@ -269,6 +274,8 @@ def main(port, config_json):
             game.timelimit[0] = config['btime'] // 1000
             game.timelimit[1] = config['wtime'] // 1000
             game.byoyomi = config['byoyomi'] // 1000
+            game.inc[0] = config['binc'] // 1000
+            game.inc[1] = config['winc'] // 1000
             game.id = uuid.uuid4()
 
             games.append(game)
@@ -383,6 +390,7 @@ def main(port, config_json):
             m = min(game.timelimit[color], elapsed)
             game.timelimit[color] -= m
             elapsed -= m
+            game.timelimit[color] += game.inc[color]
 
         if elapsed > game.byoyomi:
             # Lose by timelimit.
