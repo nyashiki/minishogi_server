@@ -38,6 +38,8 @@ var display = function() {
     if (timelimit != null) {
         var remain_time = side_to_move == 0? timelimit["btime"] : timelimit["wtime"];
         var byoyomi = timelimit["byoyomi"];
+        var binc = timelimit["binc"];
+        var winc = timelimit["winc"];
         var current_time = new Date().getTime();
 
         if (ongoing && gameover == "") {
@@ -51,21 +53,29 @@ var display = function() {
             }
 
             if (elapsed_seconds > 0) {
-                byoyomi -= Math.ceil(elapsed_seconds);
+                if (byoyomi > 0) {
+                    byoyomi -= Math.ceil(elapsed_seconds);
+                } else {
+                    if (side_to_move == 0) {
+                        binc -= Math.ceil(elapsed_seconds);
+                    } else {
+                        winc -= Math.ceil(elapsed_seconds);
+                    }
+                }
             }
         }
 
         if (side_to_move == 0) {
-            document.getElementById("btime").innerHTML = "先手残り " + remain_time + " 秒 秒読み " + byoyomi + " 秒";
-            document.getElementById("wtime").innerHTML = "後手残り " + timelimit["wtime"] + " 秒 秒読み " + timelimit["byoyomi"] + " 秒";
+            document.getElementById("btime").innerHTML = "BLACK: remains " + remain_time + " [s], byoyomi " + byoyomi + " [s], inc " + binc + " [s]";
+            document.getElementById("wtime").innerHTML = "WHITE: remains " + timelimit["wtime"] + " [s], byoyomi " + timelimit["byoyomi"] + " [s], inc " + winc + " [s]";
         } else {
-            document.getElementById("btime").innerHTML = "先手残り " + timelimit["btime"] + " 秒 秒読み " + timelimit["byoyomi"] + " 秒";
-            document.getElementById("wtime").innerHTML = "後手残り " + remain_time + " 秒 秒読み " + byoyomi + " 秒";
+            document.getElementById("btime").innerHTML = "BLACK: remains " + timelimit["btime"] + " [s], byoyomi " + timelimit["byoyomi"] + " [s], inc " + binc + " [s]";
+            document.getElementById("wtime").innerHTML = "WHITE: remains " + remain_time + " [s], byoyomi " + byoyomi + " [s], inc " + winc + " [s]";
         }
     }
 };
 
-var download_csa = function() {
+var download_json = function() {
     socket.emit("download", id, function (data) {
         download(data["kif"], data["filename"], "text/plain");
     });
