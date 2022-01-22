@@ -22,7 +22,19 @@ var get_matching = function() {
 
             var list = document.createElement("li");
             list.innerHTML = "<a href=" + element["link"] + ">" + element["player1"] + " - " + element["player2"] + "</a>";
+            if (element["gameover"])
+                list.innerHTML += " [" + element["gameover"] + "]";
             target.appendChild(list);
+        });
+    });
+
+    socket.emit("tournament", function (data) {
+        data.forEach(function(element) {
+            var list = document.createElement("li");
+            list.innerHTML = "<a style='white-space: pre;'>" + element["player1"] + " vs. " + element["player2"] + "<br>"
+                                + "win " + element["player1_win"] + " : " + element["player2_win"] + "<br>" 
+                                + "results " + element["result"] + "</a>";
+            document.getElementById("tournament").appendChild(list);
         });
     });
 };
