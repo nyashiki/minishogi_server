@@ -1,3 +1,6 @@
 log/games
+log/tournaments
 !.gitkeep
 
+client1.json
+client2.json

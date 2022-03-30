@@ -40,6 +40,16 @@ The config json file consits of the following:
 - byoyomi
 
     The amount of byo-yomi.
+- tournament
+
+    Enable tournament mode. The amount of games that server will play.
+- swap_turn
+
+    Only work in tournament mode. Play every position twice, and each player goes sente one time.
+- initial_positions
+
+    A list of the initial positions. The game position will start from the first of the list.
+    In tournament mode, the positions will be used sequentially.
 
 
 ## Client

@@ -6,6 +6,8 @@ import socketio
 import subprocess
 import threading
 import queue
+import time
+import minishogilib
 
 
 def send_message(engine, message, verbose=True):
@@ -58,34 +60,42 @@ def main(ip, port, config_json):
     with open(config_json) as f:
         config = json.load(f)
 
-    # Run an USI engine.
-    usi_engine = subprocess.Popen(config['command'].split(), cwd=config['cwd'], stdin=subprocess.PIPE, stdout=subprocess.PIPE)
+    state = minishogilib.Position()
 
-    # Run a thread that receives outputs of stdout of the USI engine.
+    usi_engine = None
     message_queue = queue.Queue()
-    threading.Thread(target=message_reader, args=[usi_engine.stdout, message_queue]).start()
 
-    # Send usi command to the engine.
-    send_message(usi_engine, 'usi')
+    def start_engine():
+        # Run an USI engine.
+        nonlocal usi_engine
+        usi_engine = subprocess.Popen(config['command'].split(), cwd=config['cwd'], stdin=subprocess.PIPE, stdout=subprocess.PIPE)
 
-    # Get engine information.
-    engine_info = { }
-    while True:
-        output = receive_message(message_queue).split()
+        # Run a thread that receives outputs of stdout of the USI engine.
+        threading.Thread(target=message_reader, args=[usi_engine.stdout, message_queue]).start()
 
-        if len(output) == 0:
-            continue
+        # Send usi command to the engine.
+        send_message(usi_engine, 'usi')
 
-        if output[0] == 'id':
-            engine_info[output[1]] = output[2]
+        # Get engine information.
+        engine_info = { }
+        while True:
+            output = receive_message(message_queue).split(None, 2)
 
-        if output[0] == 'usiok':
-            break
+            if len(output) == 0:
+                continue
 
-    # Set USI options
-    for option, value in config['option'].items():
-        message = 'setoption name {} value {}'.format(option, value)
-        send_message(usi_engine, message)
+            if output[0] == 'id':
+                engine_info[output[1]] = output[2]
+
+            if output[0] == 'usiok':
+                break
+
+        # Set USI options
+        for option, value in config['option'].items():
+            message = 'setoption name {} value {}'.format(option, value)
+            send_message(usi_engine, message)
+
+        sio.emit('usi', engine_info, namespace='/match')
 
     # #########################################################################################
     # Socket-IO Events BEGIN
@@ -93,10 +103,18 @@ def main(ip, port, config_json):
     sio = socketio.Client()
 
     @sio.event(namespace='/match')
-    def connect(data=None):
-        """Connect to the matching server.
-        """
-        sio.emit('usi', engine_info, namespace='/match')
+    def restart_engine(data=None):
+        # Quit the USI engine
+        send_message(usi_engine, 'quit')
+        usi_engine.wait()
+
+        # Initialize
+        with message_queue.mutex:
+            message_queue.queue.clear()
+        nextmove.ponder = None
+
+        # Start the USI engine
+        start_engine()
 
     @sio.on('error', namespace='/match')
     def error(message):
@@ -157,6 +175,7 @@ def main(ip, port, config_json):
                 nextmove.ponder = None
 
                 # Wait until `bestmove` command is sent.
+                # Note: this `bestmove` command is dummy, because the predicted ponder move is different from the actual given move.
                 while True:
                     output = receive_message(message_queue).split()
 
@@ -168,12 +187,18 @@ def main(ip, port, config_json):
 
         # Sfen representation of the current position.
         sfen_position = 'position sfen ' + data['position']
+        
+        # Start the timer
+        think_start_time = time.time_ns()
 
         if nextmove.ponder is None:
             # Ask the USI engine a next move.
             send_message(usi_engine, sfen_position)
 
-            command = 'go btime {} wtime {} byoyomi {}'.format(data['btime'], data['wtime'], data['byoyomi'])
+            if data['byoyomi'] > 0:
+                command = 'go btime {} wtime {} byoyomi {}'.format(data['btime'], data['wtime'], data['byoyomi'])
+            else:
+                command = 'go btime {} wtime {} binc {} winc {}'.format(data['btime'], data['wtime'], data['binc'], data['winc'])
             send_message(usi_engine, command)
 
         # Wait until `bestmove` command is sent.
@@ -185,6 +210,14 @@ def main(ip, port, config_json):
 
             if output[0] == 'bestmove':
                 sio.emit('bestmove', output[1], namespace='/match')
+                
+                # Calculate the remaining time while pondering.
+                think_elapsed = (time.time_ns() - think_start_time) // 1000000
+                state.set_sfen(data['position'])
+                if state.get_side_to_move() == 0:
+                    data['btime'] -= think_elapsed
+                else:
+                    data['wtime'] -= think_elapsed
 
                 if len(output) >= 4 and output[2] == 'ponder':
                     # If ponder is sent, set ponder move and send `go ponder` command to the USI engine.
@@ -195,8 +228,12 @@ def main(ip, port, config_json):
                     else:
                         ponder_position = '{} {} {}'.format(sfen_position, output[1], nextmove.ponder)
 
-                    send_message(usi_engine, ponder_position)
-                    send_message(usi_engine, 'go ponder')
+                    send_message(usi_engine, ponder_position)                    
+                    if data['byoyomi'] > 0:
+                        command = 'go ponder btime {} wtime {} byoyomi {}'.format(data['btime'], data['wtime'], data['byoyomi'])
+                    else:
+                        command = 'go ponder btime {} wtime {} binc {} winc {}'.format(data['btime'], data['wtime'], data['binc'], data['winc'])
+                    send_message(usi_engine, command)
                 else:
                     nextmove.ponder = None
 
@@ -221,6 +258,7 @@ def main(ip, port, config_json):
 
     url = 'http://{}:{}'.format(ip, port)
     sio.connect(url)
+    start_engine()
     sio.wait()
 
 if __name__ == '__main__':

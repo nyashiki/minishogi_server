@@ -32,40 +32,66 @@ socket.on("display", function(data) {
 
     ongoing = data["ongoing"];
     gameover = data["gameover"];
+
+    sente = data["sente"];
+    gote = data["gote"];
+
+    document.getElementById("player").innerHTML = sente + " vs. " + gote;
+    if (side_to_move == 0) {
+        document.getElementById("btime").style.color = "red";
+        document.getElementById("wtime").style.color = "black";
+    }
+    else {
+        document.getElementById("btime").style.color = "black";
+        document.getElementById("wtime").style.color = "red";
+    }
+    document.getElementById("btime").innerHTML = "先手残り " + timelimit["btime"] / 1000 + " 秒 秒読み " + timelimit["byoyomi"] / 1000 + " 秒";
+    document.getElementById("wtime").innerHTML = "後手残り " + timelimit["wtime"] / 1000 + " 秒 秒読み " + timelimit["byoyomi"] / 1000 + " 秒";
+    document.getElementById("info").innerHTML = gameover;
 });
 
 var display = function() {
     if (timelimit != null) {
         var remain_time = side_to_move == 0? timelimit["btime"] : timelimit["wtime"];
         var byoyomi = timelimit["byoyomi"];
+        var binc = timelimit["binc"];
+        var winc = timelimit["winc"];
         var current_time = new Date().getTime();
 
         if (ongoing && gameover == "") {
             var diff = current_time - think_start_time;
-            var elapsed_seconds = Math.ceil(diff / 1000);
+            var elapsed_ms = diff;
 
             if (remain_time > 0) {
-                m = Math.min(remain_time, elapsed_seconds);
+                m = Math.min(remain_time, elapsed_ms);
                 remain_time -= m;
-                elapsed_seconds -= m;
+                elapsed_ms -= m;
             }
 
-            if (elapsed_seconds > 0) {
-                byoyomi -= Math.ceil(elapsed_seconds);
+            if (elapsed_ms > 0) {
+                if (byoyomi > 0) {
+                    byoyomi -= elapsed_ms;
+                } else {
+                    if (side_to_move == 0) {
+                        binc -= elapsed_ms;
+                    } else {
+                        winc -= elapsed_ms;
+                    }
+                }
             }
         }
 
         if (side_to_move == 0) {
-            document.getElementById("btime").innerHTML = "先手残り " + remain_time + " 秒 秒読み " + byoyomi + " 秒";
-            document.getElementById("wtime").innerHTML = "後手残り " + timelimit["wtime"] + " 秒 秒読み " + timelimit["byoyomi"] + " 秒";
+            document.getElementById("btime").innerHTML = "先手残り " + remain_time / 1000 + " 秒 秒読み " + byoyomi / 1000 + " 秒";
+            document.getElementById("wtime").innerHTML = "後手残り " + timelimit["wtime"] / 1000 + " 秒 秒読み " + timelimit["byoyomi"] / 1000 + " 秒";
         } else {
-            document.getElementById("btime").innerHTML = "先手残り " + timelimit["btime"] + " 秒 秒読み " + timelimit["byoyomi"] + " 秒";
-            document.getElementById("wtime").innerHTML = "後手残り " + remain_time + " 秒 秒読み " + byoyomi + " 秒";
+            document.getElementById("btime").innerHTML = "先手残り " + timelimit["btime"] / 1000 + " 秒 秒読み " + timelimit["byoyomi"] / 1000 + " 秒";
+            document.getElementById("wtime").innerHTML = "後手残り " + remain_time / 1000 + " 秒 秒読み " + byoyomi / 1000 + " 秒";
         }
     }
 };
 
-var download_csa = function() {
+var download_json = function() {
     socket.emit("download", id, function (data) {
         download(data["kif"], data["filename"], "text/plain");
     });
